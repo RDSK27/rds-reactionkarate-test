@@ -1,0 +1,9 @@
+# herramientas de desarrollo, no forman parte de la app publicada
+_dev/
+_serve.js
+defensa.html
+node_modules/
+_c.js
+_blk*.js
+_chk.js
+.DS_Store
