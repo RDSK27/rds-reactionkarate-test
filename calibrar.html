@@ -51,6 +51,8 @@
   .valrow label:has(input:checked){background:var(--rojo);border-color:var(--rojo);color:#fff;}
   .counterchk{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.66rem;color:#333;max-width:150px;line-height:1.25;}
   .counterchk input{flex:none;width:15px;height:15px;}
+  .ref-lbl{position:absolute;bottom:2px;left:2px;right:2px;text-align:center;background:rgba(17,17,17,.78);
+    color:#fff;font-size:.58rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase;padding:3px 2px;border-radius:3px;}
   footer{position:fixed;left:0;right:0;bottom:0;background:#000;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     display:flex;gap:8px;align-items:center;z-index:20;border-top:4px solid var(--rojo2);}
   footer button{background:var(--rojo);color:#fff;border:0;border-radius:4px;font-weight:900;letter-spacing:.08em;
@@ -66,6 +68,7 @@
   <b>Calibrar dianas</b>
   <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Si una postura no deja ninguna zona abierta (está defendiendo todo / en guardia), marca la casilla "Sin sitio de ataque" en vez de poner un aro.<br><br>
   <b>Nuevo para Modo Combate</b> — En cada ataque: marca su valor (Yuko/Waza-ari/Ippon) y, si al pararlo dejas al rival con algún hueco para contraatacar, el punto verde de "Punto de contraataque" (si no expone nada, marca "Sin contraataque"). En cada guardia/defensa: elige qué zona defiende (el pique que provoca que el rival adopte esa postura).<br><br>
+  <b>Amago (abajo del todo)</b> — para cada postura, arrastra el aro sobre la GUARDIA NEUTRA (imagen de la izquierda) al punto exacto donde habría que tocar para provocar que el rival cambie a la postura de la derecha.<br><br>
   Luego pulsa EXPORTAR y me pegas el texto.</p>
 </header>
 <div id="list"></div>
@@ -84,6 +87,9 @@ var GROUPS = [
     'kick_low','sweep_low' ] },
   { title:'Guardias y defensas — toca la zona abierta a atacar (Modo Ataque)', type:'guard', items:[
     'guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low',
+    'block_side','block_high','block_cross','block_low','cover' ] },
+  { title:'Amago — toca en la GUARDIA NEUTRA el punto que activa cada postura', type:'amago', items:[
+    'guard_closed','guard_chest','guard_flank','guard_temple','guard_low',
     'block_side','block_high','block_cross','block_low','cover' ] }
 ];
 var DEFAULTS = {
@@ -104,21 +110,29 @@ var ZONES = [['','— sin elegir —'],['cabeza','Cabeza'],['torso','Torso'],
   ['costado_izq','Costado izquierdo'],['costado_der','Costado derecho'],['piernas','Piernas']];
 var DEFAULT_DEFEND = {}; // sin defaults -- lo decide el usuario, no adivinar como con las dianas de Ataque
 
-var LSKEY = 'rds_karate_dianas_v3';
+var LSKEY = 'rds_karate_dianas_v5';
+var LSKEY_OLD_V4 = 'rds_karate_dianas_v4';
+var LSKEY_OLD_V3 = 'rds_karate_dianas_v3';
 var LSKEY_OLD = 'rds_karate_dianas_v2';
-var saved = { pts:{}, counter:{}, value:{}, defend:{} };
+var saved = { pts:{}, counter:{}, value:{}, defend:{}, amago:{}, picoValue:{}, counterValue:{} };
 try {
-  var v3 = JSON.parse(localStorage.getItem(LSKEY) || 'null');
-  if(v3){ saved = v3; }
+  var v5 = JSON.parse(localStorage.getItem(LSKEY) || 'null');
+  var v4 = v5 ? null : JSON.parse(localStorage.getItem(LSKEY_OLD_V4) || 'null');
+  var v3 = (v5 || v4) ? null : JSON.parse(localStorage.getItem(LSKEY_OLD_V3) || 'null');
+  if(v5){ saved = v5; }
+  else if(v4){ saved = v4; saved.picoValue = {}; saved.counterValue = {}; }
+  else if(v3){ saved = v3; saved.amago = {}; saved.picoValue = {}; saved.counterValue = {}; }
   else {
     var v2 = JSON.parse(localStorage.getItem(LSKEY_OLD) || '{}'); // migra solo los puntos de la version anterior
     saved.pts = v2;
   }
+  if(!saved.picoValue) saved.picoValue={};
+  if(!saved.counterValue) saved.counterValue={};
 } catch(e){}
 
 var MANIFEST = [{"name":"guard_base","w":168,"h":332},{"name":"atk_jab","w":168,"h":334},{"name":"atk_cross","w":185,"h":334},{"name":"atk_combo","w":179,"h":332},{"name":"atk_elbow","w":181,"h":349},{"name":"kick_front","w":168,"h":353},{"name":"kick_mid","w":170,"h":348},{"name":"kick_high","w":179,"h":354},{"name":"knee","w":140,"h":340},{"name":"kick_low","w":276,"h":348},{"name":"sweep_low","w":359,"h":259},{"name":"guard_closed","w":168,"h":333},{"name":"guard_chest","w":167,"h":335},{"name":"guard_flank","w":179,"h":334},{"name":"guard_temple","w":179,"h":333},{"name":"block_side","w":180,"h":349},{"name":"guard_low","w":178,"h":340},{"name":"block_high","w":179,"h":351},{"name":"block_cross","w":176,"h":348},{"name":"block_low","w":125,"h":340},{"name":"cover","w":157,"h":345},{"name":"evade_back","w":186,"h":243}];
 var META = {};
-var pts = {}, counterPts = {}, values = {}, defends = {};
+var pts = {}, counterPts = {}, values = {}, defends = {}, amagoPts = {}, picoValues = {}, counterValues = {};
 MANIFEST.forEach(function(s){ META[s.name] = s; });
 build();
 
@@ -134,6 +148,7 @@ function build(){
   GROUPS.forEach(function(g){
     var h = document.createElement('div'); h.className='grouphdr'; h.textContent=g.title; list.appendChild(h);
     g.items.forEach(function(name){
+      if(g.type==='amago'){ buildAmagoCard(name); return; }
       var meta = META[name]; if(!meta) return;
       var has = Object.prototype.hasOwnProperty.call(saved.pts||{},name);
       var raw = has ? saved.pts[name] : (DEFAULTS[name]!==undefined ? DEFAULTS[name] : [0.5,0.5]);
@@ -144,6 +159,8 @@ function build(){
       var cpRaw = saved.counter && Object.prototype.hasOwnProperty.call(saved.counter,name) ? saved.counter[name] : undefined;
       counterPts[name] = cpRaw!==undefined ? cpRaw : null;
       var lastCounter = counterPts[name] || [0.5,0.5];
+      picoValues[name] = (saved.picoValue && saved.picoValue[name]) || 'yuko';
+      counterValues[name] = (saved.counterValue && saved.counterValue[name]) || 'yuko';
 
       var card = document.createElement('div'); card.className='card';
       var col = document.createElement('div');
@@ -159,17 +176,9 @@ function build(){
       if(g.type==='atk'){
         var valFld = document.createElement('div'); valFld.className='fld';
         var valLbl = document.createElement('div'); valLbl.className='fld-lbl'; valLbl.textContent='Valor si conecta';
-        var valrow = document.createElement('div'); valrow.className='valrow';
-        VALUES.forEach(function(v){
-          var lab=document.createElement('label');
-          var inp=document.createElement('input'); inp.type='radio'; inp.name='val_'+name; inp.value=v[0];
-          inp.checked = values[name]===v[0];
-          var sp=document.createElement('span'); sp.textContent=v[1];
-          lab.appendChild(inp); lab.appendChild(sp);
-          inp.addEventListener('change', function(){ values[name]=v[0]; persist(); });
-          valrow.appendChild(lab);
-        });
-        valFld.appendChild(valLbl); valFld.appendChild(valrow); col.appendChild(valFld);
+        valFld.appendChild(valLbl);
+        valFld.appendChild(buildValueRow('val_'+name, function(){return values[name];}, function(v){values[name]=v;}));
+        col.appendChild(valFld);
 
         var ctrFld = document.createElement('div'); ctrFld.className='fld';
         var ctrLbl = document.createElement('div'); ctrLbl.className='fld-lbl'; ctrLbl.textContent='Contraataque tras pararlo';
@@ -179,6 +188,11 @@ function build(){
         ctrRo = document.createElement('div'); ctrRo.className='readout';
         ctrFld.appendChild(ctrLbl); ctrFld.appendChild(ctrChk); ctrFld.appendChild(ctrRo); col.appendChild(ctrFld);
         ctrChk._input = ctrInp;
+
+        var ctrValLbl = document.createElement('div'); ctrValLbl.className='fld-lbl'; ctrValLbl.style.marginTop='6px';
+        ctrValLbl.textContent='Valor si acierto el contraataque';
+        ctrFld.appendChild(ctrValLbl);
+        ctrFld.appendChild(buildValueRow('ctrval_'+name, function(){return counterValues[name];}, function(v){counterValues[name]=v;}));
       } else if(g.type==='guard'){
         var defFld = document.createElement('div'); defFld.className='fld';
         var defLbl = document.createElement('div'); defLbl.className='fld-lbl'; defLbl.textContent='¿Qué defiende? (pico que la provoca)';
@@ -187,6 +201,12 @@ function build(){
         defSel.value = defends[name];
         defSel.addEventListener('change', function(){ defends[name]=defSel.value; persist(); });
         defFld.appendChild(defLbl); defFld.appendChild(defSel); col.appendChild(defFld);
+
+        var picoValFld = document.createElement('div'); picoValFld.className='fld';
+        var picoValLbl = document.createElement('div'); picoValLbl.className='fld-lbl'; picoValLbl.textContent='Valor si acierto el hueco (amago en Combate)';
+        picoValFld.appendChild(picoValLbl);
+        picoValFld.appendChild(buildValueRow('picoval_'+name, function(){return picoValues[name];}, function(v){picoValues[name]=v;}));
+        col.appendChild(picoValFld);
       }
 
       var w = STAGE_H * (meta.w/meta.h);
@@ -308,8 +328,77 @@ function build(){
   updProgress();
 }
 
+function buildValueRow(radioGroupName, getVal, setVal){
+  var row = document.createElement('div'); row.className='valrow';
+  VALUES.forEach(function(v){
+    var lab=document.createElement('label');
+    var inp=document.createElement('input'); inp.type='radio'; inp.name=radioGroupName; inp.value=v[0];
+    inp.checked = getVal()===v[0];
+    var sp=document.createElement('span'); sp.textContent=v[1];
+    lab.appendChild(inp); lab.appendChild(sp);
+    inp.addEventListener('change', function(){ setVal(v[0]); persist(); });
+    row.appendChild(lab);
+  });
+  return row;
+}
+
+function buildAmagoCard(name){
+  var baseMeta = META['guard_base'], targetMeta = META[name];
+  if(!baseMeta || !targetMeta) return;
+  var raw = (saved.amago && saved.amago[name]) || null;
+  amagoPts[name] = raw ? raw.slice() : [0.5, 0.5];
+
+  var card = document.createElement('div'); card.className='card';
+  var col = document.createElement('div');
+  var nm = document.createElement('div'); nm.className='name'; nm.textContent=name;
+  var ro = document.createElement('div'); ro.className='readout';
+  col.appendChild(nm); col.appendChild(ro);
+
+  var baseW = STAGE_H * (baseMeta.w/baseMeta.h);
+  var baseStage = document.createElement('div'); baseStage.className='stage';
+  baseStage.style.width = baseW+'px'; baseStage.style.height = STAGE_H+'px';
+  var baseImg = document.createElement('img'); baseImg.src = 'assets/guard_base.png';
+  baseStage.appendChild(baseImg);
+
+  var refH = 160, refW = refH * (targetMeta.w/targetMeta.h);
+  var refStage = document.createElement('div'); refStage.className='stage';
+  refStage.style.width = refW+'px'; refStage.style.height = refH+'px'; refStage.style.alignSelf='flex-end';
+  var refImg = document.createElement('img'); refImg.src = 'assets/'+name+'.png';
+  var refLbl = document.createElement('div'); refLbl.className='ref-lbl'; refLbl.textContent='→ '+name;
+  refStage.appendChild(refImg); refStage.appendChild(refLbl);
+
+  card.appendChild(col); card.appendChild(baseStage); card.appendChild(refStage);
+  document.getElementById('list').appendChild(card);
+
+  var handle = document.createElement('div'); handle.className='handle';
+  var dragging=false;
+  function place(){
+    handle.style.left = (amagoPts[name][0]*100)+'%';
+    handle.style.top = (amagoPts[name][1]*100)+'%';
+    ro.textContent = 'hx '+amagoPts[name][0].toFixed(3)+' hy '+amagoPts[name][1].toFixed(3);
+  }
+  function fromEvent(ev){
+    var r = baseStage.getBoundingClientRect();
+    amagoPts[name][0] = Math.max(0, Math.min(1, (ev.clientX-r.left)/r.width));
+    amagoPts[name][1] = Math.max(0, Math.min(1, (ev.clientY-r.top)/r.height));
+    place();
+  }
+  handle.addEventListener('pointerdown', function(ev){ dragging=true; handle.setPointerCapture(ev.pointerId); ev.preventDefault(); ev.stopPropagation(); });
+  handle.addEventListener('pointermove', function(ev){ if(dragging){ fromEvent(ev); } });
+  handle.addEventListener('pointerup', function(ev){ dragging=false; persist(); });
+  baseStage.appendChild(handle);
+  baseStage.addEventListener('pointerdown', function(ev){
+    if(ev.target!==baseStage && ev.target!==baseImg) return;
+    var r = baseStage.getBoundingClientRect();
+    amagoPts[name][0] = Math.max(0, Math.min(1, (ev.clientX-r.left)/r.width));
+    amagoPts[name][1] = Math.max(0, Math.min(1, (ev.clientY-r.top)/r.height));
+    place(); persist();
+  });
+  place();
+}
+
 function persist(){
-  try { localStorage.setItem(LSKEY, JSON.stringify({pts:pts, counter:counterPts, value:values, defend:defends})); } catch(e){}
+  try { localStorage.setItem(LSKEY, JSON.stringify({pts:pts, counter:counterPts, value:values, defend:defends, amago:amagoPts, picoValue:picoValues, counterValue:counterValues})); } catch(e){}
   updProgress();
 }
 function updProgress(){
@@ -322,7 +411,8 @@ function updProgress(){
   Object.keys(defends).forEach(function(k){ if(defends[k]) defended++; });
   Object.keys(counterPts).forEach(function(k){ if(counterPts[k]===null) noCounter++; });
   document.getElementById('progress').textContent = guard+' sin sitio de ataque · '+multi+' con puntos alternativos · '+
-    defended+'/'+Object.keys(defends).length+' guardias con "qué defiende" · '+noCounter+' ataques sin contraataque (se guarda solo al tocar)';
+    defended+'/'+Object.keys(defends).length+' guardias con "qué defiende" · '+noCounter+' ataques sin contraataque · '+
+    Object.keys(amagoPts).length+'/10 puntos de amago (se guarda solo al tocar)';
 }
 function exportAll(){
   var hits = {};
@@ -334,12 +424,17 @@ function exportAll(){
   var atkNames = GROUPS.filter(function(g){return g.type==='atk';})[0].items;
   var guardNames = GROUPS.filter(function(g){return g.type==='guard';})[0].items;
   var counters = {}, vals = {}, defs = {};
+  var counterVals = {};
   atkNames.forEach(function(k){
     counters[k] = counterPts[k]===null ? null : [ +counterPts[k][0].toFixed(3), +counterPts[k][1].toFixed(3) ];
     vals[k] = values[k];
+    counterVals[k] = counterValues[k];
   });
-  guardNames.forEach(function(k){ defs[k] = defends[k]; });
-  var o = { hits:hits, values:vals, defends:defs, counters:counters };
+  var picoVals = {};
+  guardNames.forEach(function(k){ defs[k] = defends[k]; picoVals[k] = picoValues[k]; });
+  var amago = {};
+  Object.keys(amagoPts).forEach(function(k){ amago[k] = [ +amagoPts[k][0].toFixed(3), +amagoPts[k][1].toFixed(3) ]; });
+  var o = { hits:hits, values:vals, defends:defs, counters:counters, amago:amago, picoValues:picoVals, counterValues:counterVals };
   document.getElementById('out').value = JSON.stringify(o);
 }
 function copyOut(){

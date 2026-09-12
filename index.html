@@ -282,12 +282,14 @@ if('serviceWorker' in navigator){
   .k-status.pointao{ background:rgba(21,101,216,.94); font-size:1.05rem; }
   .k-status.end{ background:rgba(17,17,17,.96); font-size:1.05rem; letter-spacing:.08em; }
   .c-controls{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 14px; flex-shrink:0; }
-  .c-amago-btn{ background:#333; color:#fff; border:0; border-radius:6px; padding:12px 30px; font-weight:900;
-    letter-spacing:.12em; text-transform:uppercase; font-size:.85rem; cursor:pointer; }
+  .c-amago-btn{ background:#333; color:#fff; border:0; border-radius:6px; padding:12px 20px; font-weight:900;
+    display:flex; align-items:center; gap:12px; cursor:pointer; }
   .c-amago-btn:disabled{ background:#999; cursor:not-allowed; }
-  .c-zones{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
-  .c-zones button{ background:var(--rojo); color:#fff; border:0; border-radius:5px; padding:9px 12px; font-weight:900;
-    font-size:.66rem; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; }
+  .c-amago-label{ letter-spacing:.12em; text-transform:uppercase; font-size:.85rem; }
+  .c-amago-pips{ display:flex; gap:5px; }
+  .c-amago-pip{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:.68rem; font-weight:900; background:rgba(255,255,255,.22); color:#fff; }
+  .c-amago-pip.dim{ background:rgba(255,255,255,.08); color:rgba(255,255,255,.4); }
 </style>
 </head>
 <body class="home-active">
@@ -373,7 +375,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v13</div>
+    <div class="app-ver">v16</div>
     </div>
 
   </main>
@@ -405,14 +407,10 @@ if('serviceWorker' in navigator){
       </div>
     </div>
     <div class="c-controls" id="cControls" style="display:none">
-      <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()">Amago</button>
-      <div class="c-zones" id="cZones" style="display:none">
-        <button onclick="cPickZone('cabeza')">Cabeza</button>
-        <button onclick="cPickZone('torso')">Torso</button>
-        <button onclick="cPickZone('costado_izq')">Costado izq.</button>
-        <button onclick="cPickZone('costado_der')">Costado der.</button>
-        <button onclick="cPickZone('piernas')">Piernas</button>
-      </div>
+      <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()">
+        <span class="c-amago-label">Amago</span>
+        <span class="c-amago-pips" id="cAmagoPips"></span>
+      </button>
     </div>
   <div class="results-actions">
     <button class="game-ctrl-btn" onclick="goHome()">&#8592; Inicio</button>
@@ -817,7 +815,7 @@ function applyModeUI(mode){
   var bs2 = $('seg2').querySelectorAll('button');
   var cfg = mode==='cmb' ? SEG2_MINS : SEG2_REPS;
   for(var i=0;i<bs2.length;i++){ bs2[i].setAttribute('data-v',cfg[i][0]); bs2[i].textContent=cfg[i][1]; }
-  setSeg('seg2', cfg[1][0]);
+  setSeg('seg2', mode==='cmb' ? cfg[0][0] : cfg[1][0]);
   var contBtn = $('seg3').querySelector('[data-v="cont"]');
   if(mode==='cmb'){ contBtn.disabled=true; setSeg('seg3','paus'); }
   else{ contBtn.disabled=false; }
@@ -907,7 +905,7 @@ Object.keys(K_SPR).forEach(function(k){ var im=new Image(); im.src=K_DIR+k+".png
 var A_HITS = {
   guard_chest:[0.497,0.12], guard_flank:[0.503,0.115], guard_temple:[0.611,0.133],
   guard_low:[0.5,0.13], block_side:[0.6,0.113], block_high:[0.695,0.351],
-  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[0.753,0.393],
+  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.272,0.4]],
   guard_base:null, guard_closed:null
 };
 var A_NAMES = {
@@ -945,11 +943,16 @@ var C_DEFENDS = {
   guard_temple:'costado_der', guard_low:'piernas', block_side:'torso', block_high:'cabeza',
   block_cross:'costado_izq', block_low:'torso', cover:'cabeza'
 };
-var C_ZONE_POSES = {}; // agrupa guardias por zona defendida, para elegir una al azar cuando el jugador amaga esa zona
-Object.keys(C_DEFENDS).forEach(function(k){
-  var z = C_DEFENDS[k]; if(!z) return;
-  (C_ZONE_POSES[z] = C_ZONE_POSES[z]||[]).push(k);
-});
+/* C_AMAGO_POINTS: punto (hx,hy) sobre la guardia NEUTRA (guard_base) que hay que
+   tocar para provocar cada postura de defensa -- calibrado en calibrar.html
+   (sección "Amago"). Mientras no esté calibrado (null) esa postura no puede
+   salir como resultado de un amago por toque directo. */
+var C_AMAGO_POINTS = {
+  guard_closed:[0.687,0.185], guard_chest:[0.483,0.343], guard_flank:[0.335,0.367], guard_temple:[0.32,0.177],
+  guard_low:[0.608,0.585], block_side:[0.401,0.122], block_high:[0.641,0.092], block_cross:[0.5,0.5],
+  block_low:[0.69,0.39], cover:[0.529,0.145]
+};
+var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
 var C_WIN_PICO = 300;    // ms para entrar al hueco tras un pique
 var C_WIN_PARAR = 250;   // ms para contraatacar tras parar una técnica del rival
 
@@ -1101,37 +1104,69 @@ function kFinish(){
 
 /* ===================================================================
    MODO COMBATE
-   Parado -> el jugador amaga (pico) una zona, o el rival ataca por su
-   cuenta. Un pique hace que el rival cambie a la guardia que defiende
-   esa zona (C_ZONE_POSES), dejando abierta su propia diana ya calibrada
-   (A_HITS) — margen C_WIN_PICO. Si el jugador para un ataque real del
-   rival a tiempo y esa técnica tiene contraataque (C_COUNTERS), se abre
-   una ventana C_WIN_PARAR para rematar. Los puntos paran el reloj.
+   Parado (reloj corriendo, sin banner) -> el jugador pulsa "Amago" (pausa
+   el combate y muestra "COMBATE PARADO") y toca directamente sobre la
+   guardia neutra; el punto calibrado más cercano (C_AMAGO_POINTS) decide
+   qué postura de defensa activa el rival, dejando abierta su propia diana
+   ya calibrada (A_HITS) — margen C_WIN_PICO. El rival también puede atacar
+   por su cuenta. Si el jugador para un ataque real del rival a tiempo y esa
+   técnica tiene contraataque (C_COUNTERS), se abre una ventana C_WIN_PARAR
+   para rematar. Los puntos paran el reloj. Nº de amagos por combate:
+   C_AMAGOS_PER_MIN por cada minuto de duración.
    =================================================================== */
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
-          timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0 };
+          timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
+          amagoUsed:0, amagoTotal:0 };
 var C_ZONE_LABEL = { cabeza:'Cabeza', torso:'Torso', costado_izq:'Costado izquierdo', costado_der:'Costado derecho', piernas:'Piernas' };
 var C_TERM = { yuko:'Yuko', 'waza-ari':'Waza-ari', ippon:'Ippon' };
-var C_PICO_VALUE = 'yuko';    // valor de un acierto tras un pique (no especificado por el usuario, de momento fijo)
-var C_COUNTER_VALUE = 'yuko'; // valor de un acierto al contraatacar tras parar
+/* Valor (yuko/waza-ari/ippon) de un acierto de amago (por postura) o de
+   contraataque tras parar (por técnica) -- calibrado en calibrar.html. */
+var C_PICO_VALUES = {
+  guard_base:'yuko', guard_closed:'yuko', guard_chest:'yuko', guard_flank:'yuko', guard_temple:'yuko',
+  guard_low:'yuko', block_side:'yuko', block_high:'yuko', block_cross:'yuko', block_low:'yuko', cover:'yuko'
+};
+var C_COUNTER_VALUES = {
+  atk_jab:'yuko', atk_cross:'yuko', atk_combo:'yuko', kick_front:'yuko',
+  kick_mid:'yuko', kick_high:'yuko', knee:'yuko', kick_low:'yuko', sweep_low:'yuko'
+};
 
 function cAbort(){ clearTimeout(C.timer); clearInterval(C.timerId); C.active=false; C.state='idle'; }
 
 function cStart(){
   clearTimeout(C.timer); clearInterval(C.timerId);
   C.scoreAka=0; C.scoreAo=0;
-  C.timeLeft = parseInt(selVal('seg2'),10)||120;
+  C.timeLeft = parseInt(selVal('seg2'),10)||60;
   C.akaSide = Math.random()<0.5 ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
+  C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
   K.pace='paus';
-  cUpdateScore(); cUpdateTimer();
-  $('cAmagoBtn').disabled=true; $('cZones').style.display='none';
+  cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
+  $('cAmagoBtn').disabled=true;
   kRing.className='k-ring'; kMark.className='k-mark';
-  cShowPose('guard_base', null, false);
+  C.mirror = Math.random()<0.5;
+  cShowPose('guard_base', null, C.mirror);
   kSetStatus('¡Hajime!','hajime');
   C.timer=setTimeout(function(){
     C.paused=false; cResumeTimer(); cParado();
   }, 1400);
+}
+function cRenderAmagoPips(){
+  var el = $('cAmagoPips'); if(!el) return;
+  el.innerHTML='';
+  var used=C.amagoUsed, total=C.amagoTotal;
+  var batch = Math.floor(used/5);
+  var consumedInBatch = used - batch*5;
+  var hasNextBatch = (batch+1)*5 < total;
+  for(var p=0;p<5;p++){
+    var span = document.createElement('span'); span.className='c-amago-pip';
+    if(p < consumedInBatch){
+      span.className += ' dim';
+      span.textContent = hasNextBatch ? ((batch+1)*5 + p + 1) : (batch*5 + p + 1);
+    } else {
+      span.textContent = batch*5 + p + 1;
+    }
+    el.appendChild(span);
+  }
 }
 function cUpdateScore(){ $('cScoreAka').textContent=C.scoreAka; $('cScoreAo').textContent=C.scoreAo; }
 function cFmtTime(s){ s=Math.max(0,s); var m=Math.floor(s/60), r=s%60; return m+':'+(r<10?'0':'')+r; }
@@ -1170,9 +1205,10 @@ function cParado(){
   if(!C.active) return;
   C.state='parado';
   kRing.className='k-ring'; kMark.className='k-mark';
-  cShowPose('guard_base', null, false);
-  kSetStatus('Combate');
-  $('cAmagoBtn').disabled=false;
+  C.mirror = Math.random()<0.5; // la guardia neutra también se espeja al azar -- despiste extra al amagar
+  cShowPose('guard_base', null, C.mirror);
+  kSetStatus('');
+  $('cAmagoBtn').disabled = (C.amagoUsed>=C.amagoTotal);
   var lo=1500, hi=4000;
   C.timer=setTimeout(cRivalSpontaneous, lo+Math.random()*(hi-lo));
 }
@@ -1185,7 +1221,7 @@ function cRivalSpontaneous(){
 function cBeginAttack(){
   clearTimeout(C.timer);
   C.state='rival_attack';
-  $('cAmagoBtn').disabled=true; $('cZones').style.display='none';
+  $('cAmagoBtn').disabled=true;
   var name = K_POOL[Math.floor(Math.random()*K_POOL.length)];
   K.tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
   C.pending = K.tech;
@@ -1219,37 +1255,60 @@ function cResolveCounter(tap){
   clearTimeout(C.timer);
   var ok = tap && tap.onTarget && tap.dt<=C_WIN_PARAR;
   C.state='done';
-  if(ok){ cAwardPoint('player', C_COUNTER_VALUE); }
+  if(ok){ cAwardPoint('player', C_COUNTER_VALUES[C.pending.s]||'yuko'); }
   else { C.timer=setTimeout(cParado, 500); }
 }
 
-/* ---- Pique (amago) del jugador ---- */
+/* ---- Pique (amago) del jugador: pulsa "Amago" (pausa el combate), luego
+   toca directamente sobre la guardia neutra -- el punto más cercano de
+   C_AMAGO_POINTS decide qué postura de defensa activa el rival. ---- */
 function cAmagoStart(){
   if(!C.active || C.state!=='parado') return;
+  if(C.amagoUsed>=C.amagoTotal) return;
   clearTimeout(C.timer);
-  C.state='zone_pick';
+  C.state='amago_aim';
   $('cAmagoBtn').disabled=true;
-  $('cZones').style.display='flex';
-  kSetStatus('Elige zona');
+  cPauseTimer();
+  kRing.className='k-ring'; kMark.className='k-mark';
+  kSetStatus('COMBATE PARADO','hajime');
 }
-function cPickZone(zone){
-  if(C.state!=='zone_pick') return;
-  $('cZones').style.display='none';
-  var pool = C_ZONE_POSES[zone];
-  if(!pool || !pool.length){ C.state='done'; C.timer=setTimeout(cParado,300); return; }
-  var pose = pool[Math.floor(Math.random()*pool.length)];
+function cNearestAmagoPose(hxF, hyF){
+  var best=null, bestD=Infinity;
+  Object.keys(C_AMAGO_POINTS).forEach(function(name){
+    var p = C_AMAGO_POINTS[name]; if(!p) return;
+    var dx=p[0]-hxF, dy=p[1]-hyF, d=dx*dx+dy*dy;
+    if(d<bestD){ bestD=d; best=name; }
+  });
+  return best;
+}
+function cResolveAmagoAim(ev){
+  if(C.state!=='amago_aim') return;
+  var r = kKata.getBoundingClientRect();
+  var hxF = (ev.clientX - r.left) / r.width;
+  var hyF = (ev.clientY - r.top) / r.height;
+  var hxCanon = C.mirror ? (1-hxF) : hxF; // la guardia neutra puede estar espejada -- deshacerlo antes de comparar
+  var pose = cNearestAmagoPose(hxCanon, hyF);
+  if(!pose){ C.state='done'; C.paused=false; C.timer=setTimeout(cParado,300); return; } // sin calibrar todavía
+  C.amagoUsed++;
+  cRenderAmagoPips();
+  cPickPose(pose);
+}
+function cPickPose(pose){
+  C.paused=false;
   var hit = A_HITS[pose];
+  var zone = C_DEFENDS[pose];
+  var mirror = Math.random()<0.5; // espejo independiente de la postura de defensa, otro despiste más
   C.state='pico_window';
   C.pending = { pose:pose, hit:hit };
-  cShowPose(pose, null, false);
+  cShowPose(pose, null, mirror);
   if(hit){
     var hp = Array.isArray(hit[0]) ? hit[Math.floor(Math.random()*hit.length)] : hit;
-    cRingAt(hp[0], hp[1], false);
+    cRingAt(hp[0], hp[1], mirror);
     kRing.className='k-ring on';
   } else {
     kRing.className='k-ring';
   }
-  kSetStatus('¡'+C_ZONE_LABEL[zone]+'!','go');
+  kSetStatus(zone ? ('¡'+C_ZONE_LABEL[zone]+'!') : '¡Amago!', 'go');
   C.t0=performance.now();
   C.timer=setTimeout(function(){ cResolvePico(null); }, C_WIN_PICO);
 }
@@ -1257,14 +1316,15 @@ function cResolvePico(tap){
   if(C.state!=='pico_window') return;
   clearTimeout(C.timer);
   var hit=C.pending.hit;
+  var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=C_WIN_PICO;
-    if(ok){ C.state='done'; return cAwardPoint('player', C_PICO_VALUE); }
+    if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
     C.timer=setTimeout(cParado, 500);
   } else {
-    if(tap){ C.state='done'; return cAwardPoint('rival', C_PICO_VALUE); } // atacó una guardia cerrada: contragolpe
+    if(tap){ C.state='done'; return cAwardPoint('rival', picoValue); } // atacó una guardia cerrada: contragolpe
     C.state='done';
     C.timer=setTimeout(cParado, 400);
   }
@@ -1284,12 +1344,13 @@ function cAwardPoint(side, value){
 function cEndMatch(){
   C.active=false; C.paused=true;
   clearInterval(C.timerId); clearTimeout(C.timer);
-  $('cAmagoBtn').disabled=true; $('cZones').style.display='none';
+  $('cAmagoBtn').disabled=true;
   var winner = C.scoreAka===C.scoreAo ? 'Empate' : (C.scoreAka>C.scoreAo ? 'Gana Aka' : 'Gana Ao');
   kSetStatus('Fin del combate · '+winner, 'end');
 }
 function cPointerDown(ev){
   if(!C.active) return;
+  if(C.state==='amago_aim') return cResolveAmagoAim(ev);
   var dt=performance.now()-C.t0;
   var r=kRing.getBoundingClientRect();
   var cx=r.left+r.width/2, cy=r.top+r.height/2;
