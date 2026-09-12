@@ -291,7 +291,7 @@ if('serviceWorker' in navigator){
 
     <div class="segment" id="seg1">
       <button class="sel" data-v="def">Defensa</button>
-      <button data-v="atk" disabled>Ataque</button>
+      <button data-v="atk">Ataque</button>
       <button data-v="cmb" disabled>Combate</button>
     </div>
 
@@ -398,7 +398,7 @@ if('serviceWorker' in navigator){
         </div>
         <div class="rq">
           <div class="rq-v" id="rV2">--</div>
-          <div class="rq-k">Defendidas</div>
+          <div class="rq-k" id="rK2">Defendidas</div>
         </div>
         <div class="rq">
           <div class="rq-v" id="rV3">--</div>
@@ -611,6 +611,7 @@ function finish(){
   $('resMsg').style.display='none'; $('resEns').style.display='none';
   /* Quad de Reaction Karate: Media ms | Defendidas x/N | % acierto | Mejor ms */
   var kDef=(S.kDef!=null?S.kDef:0), kTot=(S.kTotal!=null?S.kTotal:c.n);
+  var rk2=$('rK2'); if(rk2) rk2.textContent = (S.s1==='atk') ? 'Atacadas' : 'Defendidas';
   $('rV1').textContent=Math.round(c.avg);
   $('rV2').textContent=kDef+'/'+kTot;
   $('rV3').textContent=(kTot?Math.round(kDef/kTot*100):0)+'%';
@@ -819,14 +820,52 @@ document.addEventListener('click', function(e){ if(e.target.closest && e.target.
 
 <script>
 /* ===================================================================
-   EJERCICIO — Reaction Karate · Modo Defensa
-   El karateca parte de guardia y lanza técnicas hacia el jugador.
-   Tocar el puño/pie que viene antes del tiempo límite = defendido.
-   Tarde o fuera del punto = punto en contra (penaliza la media).
+   EJERCICIO — Reaction Karate · Modo Defensa + Modo Ataque
+   Defensa: el karateca parte de guardia y lanza técnicas hacia el jugador.
+     Tocar el puño/pie que viene antes del tiempo límite = defendido.
+     Tarde o fuera del punto = punto en contra (penaliza la media).
+   Ataque: el rival cambia de guardia dejando una zona descubierta.
+     Tocar esa zona antes de que recomponga la guardia = acierto.
+     Algunas guardias son señuelo (sin apertura real, diana bajo los pies):
+     si el jugador "ataca" ahí, se come el contragolpe.
    =================================================================== */
 var K_DIR = "assets/";
-var K_SPR = {"guard_base":{"w":168,"h":332,"cx":0.516},"atk_jab":{"w":168,"h":334,"cx":0.516},"atk_cross":{"w":185,"h":334,"cx":0.477},"atk_combo":{"w":179,"h":332,"cx":0.504},"kick_front":{"w":168,"h":353,"cx":0.495},"kick_mid":{"w":170,"h":348,"cx":0.503},"kick_high":{"w":179,"h":354,"cx":0.517},"knee":{"w":140,"h":340,"cx":0.519},"kick_low":{"w":276,"h":348,"cx":0.597},"sweep_low":{"w":359,"h":259,"cx":0.647}};
+var K_SPR = {
+  "guard_base":{"w":168,"h":332,"cx":0.516}, "atk_jab":{"w":168,"h":334,"cx":0.516},
+  "atk_cross":{"w":185,"h":334,"cx":0.477}, "atk_combo":{"w":179,"h":332,"cx":0.504},
+  "kick_front":{"w":168,"h":353,"cx":0.495}, "kick_mid":{"w":170,"h":348,"cx":0.503},
+  "kick_high":{"w":179,"h":354,"cx":0.517}, "knee":{"w":140,"h":340,"cx":0.519},
+  "kick_low":{"w":276,"h":348,"cx":0.597}, "sweep_low":{"w":359,"h":259,"cx":0.647},
+  "guard_closed":{"w":168,"h":333,"cx":0.50}, "guard_chest":{"w":167,"h":335,"cx":0.50},
+  "guard_flank":{"w":179,"h":334,"cx":0.49}, "guard_temple":{"w":179,"h":333,"cx":0.48},
+  "guard_low":{"w":178,"h":340,"cx":0.50}, "block_side":{"w":180,"h":349,"cx":0.48},
+  "block_high":{"w":179,"h":351,"cx":0.49}, "block_cross":{"w":176,"h":348,"cx":0.50},
+  "block_low":{"w":125,"h":340,"cx":0.46}, "cover":{"w":157,"h":345,"cx":0.50},
+  "evade_back":{"w":186,"h":243,"cx":0.55}
+};
 Object.keys(K_SPR).forEach(function(k){ var im=new Image(); im.src=K_DIR+k+".png"; });
+
+/* ---- Modo Ataque: guardias/bloqueos con zona abierta + señuelos ---- */
+var A_HITS = {
+  guard_chest:[0.50,0.46], guard_flank:[0.66,0.52], guard_temple:[0.62,0.11],
+  guard_low:[0.50,0.13], block_side:[0.70,0.48], block_high:[0.55,0.46],
+  block_cross:[0.38,0.76], block_low:[0.70,0.40], cover:[0.50,0.50],
+  guard_base:[0.50,0.93], guard_closed:[0.50,0.93], evade_back:[0.50,0.90]
+};
+var A_NAMES = {
+  guard_chest:'Torso abierto', guard_flank:'Costado abierto', guard_temple:'Sien abierta',
+  guard_low:'Cabeza abierta', block_side:'Costado abierto', block_high:'Torso abierto',
+  block_cross:'Piernas abiertas', block_low:'Torso abierto', cover:'Torso abierto',
+  guard_base:'Guardia cerrada', guard_closed:'Guardia cerrada', evade_back:'Se repliega'
+};
+var A_POOL_OPEN  = ['guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover'];
+var A_POOL_DECOY = ['guard_base','guard_closed','evade_back'];
+var A_POOL = A_POOL_OPEN.concat(A_POOL_DECOY);
+var A_DECOY_MS = 250; // "tiempo" que cuenta en la media cuando el jugador acierta NO atacando un señuelo
+var A_TECHS = A_POOL.map(function(k){
+  var decoy = A_POOL_DECOY.indexOf(k)>=0;
+  return { s:k, hx:A_HITS[k][0], hy:A_HITS[k][1], name:A_NAMES[k], decoy:decoy };
+});
 
 var K_HITS = {
   atk_jab:[0.784,0.174], atk_cross:[0.902,0.231], atk_combo:[0.524,0.217],
@@ -892,9 +931,10 @@ function kStart(){
   kNext();
 }
 function kUpdHud(){
+  var atk = kMode()==='atk';
   $('kHudRep').textContent = K.rep+' / '+K.total;
-  $('kHudDef').textContent = 'Def '+K.def;
-  $('kHudPt').textContent  = 'Pts '+K.pt;
+  $('kHudDef').textContent = (atk?'Acx ':'Def ')+K.def;
+  $('kHudPt').textContent  = (atk?'Fallos ':'Pts ')+K.pt;
 }
 function kNext(){
   if(K.rep>=K.total){ return kFinish(); }
@@ -909,12 +949,14 @@ function kNext(){
   K.state='ready';
   K.timer=setTimeout(kFire, lo+Math.random()*(hi-lo));
 }
+function kMode(){ return S.s1==='atk' ? 'atk' : 'def'; }
 function kFire(){
-  K.tech = K_TECHS[Math.floor(Math.random()*K_TECHS.length)];
+  var pool = kMode()==='atk' ? A_TECHS : K_TECHS;
+  K.tech = pool[Math.floor(Math.random()*pool.length)];
   K.mirror = Math.random()<0.5;
   kLayout(K.tech.s, K.tech, K.mirror);
   kRing.className='k-ring on';
-  kSetStatus('¡Defiende!','go');
+  kSetStatus(kMode()==='atk' ? '¡Ataca!' : '¡Defiende!', 'go');
   K.t0=performance.now();
   K.state='go';
   K.timer=setTimeout(function(){ kResolve(null); }, K_WINDOW+K_GRACE);
@@ -923,21 +965,31 @@ function kResolve(tap){
   if(K.state!=='go') return;
   clearTimeout(K.timer);
   K.state='done';
-  var ok = tap && tap.onTarget && tap.dt<=K_WINDOW;
+  var atk = kMode()==='atk';
+  var ok, ms, why;
+  if(atk && K.tech.decoy){
+    ok = !tap; // en un señuelo, lo correcto es NO tocar
+    ms = ok ? A_DECOY_MS : K_PENALTY;
+    why = ok ? 'Guardia cerrada · no mordiste' : 'Te contragolpearon';
+  } else {
+    ok = tap && tap.onTarget && tap.dt<=K_WINDOW;
+    ms = ok ? Math.round(tap.dt) : K_PENALTY;
+    why = ok ? Math.round(tap.dt)+' ms'
+      : (!tap ? 'Sin reacción' : (!tap.onTarget ? 'Fallaste el punto' : 'Tarde ('+Math.round(tap.dt)+' ms)'));
+  }
   if(ok){
     K.def++; S.kDef=K.def;
-    S.times.push(Math.round(tap.dt));
+    S.times.push(ms);
     kRing.className='k-ring ok';
-    kSetStatus('Defendido · '+Math.round(tap.dt)+' ms','ok');
+    kSetStatus((atk?'¡Acierto!':'Defendido')+' · '+why,'ok');
   } else {
     K.pt++;
-    S.times.push(K_PENALTY);
-    var why = !tap ? 'Sin reacción' : (!tap.onTarget ? 'Fallaste el punto' : 'Tarde ('+Math.round(tap.dt)+' ms)');
+    S.times.push(ms);
     kRing.className='k-ring no';
-    kSetStatus('Punto en contra · '+why,'no');
+    kSetStatus((atk?'Fallo':'Punto en contra')+' · '+why,'no');
   }
-  $('kHudDef').textContent='Def '+K.def;
-  $('kHudPt').textContent ='Pts '+K.pt;
+  $('kHudDef').textContent=(atk?'Acx ':'Def ')+K.def;
+  $('kHudPt').textContent =(atk?'Fallos ':'Pts ')+K.pt;
   K.timer=setTimeout(kNext, K.pace==='paus' ? 1100 : 600);
 }
 function kFinish(){
@@ -953,7 +1005,7 @@ document.addEventListener('pointerdown', function(ev){
     K.pt++;
     S.times.push(K_PENALTY);
     kRing.className='k-ring no'; kSetStatus('Te adelantaste','no');
-    $('kHudPt').textContent='Pts '+K.pt;
+    $('kHudPt').textContent=(kMode()==='atk'?'Fallos ':'Pts ')+K.pt;
     K.timer=setTimeout(kNext, K.pace==='paus' ? 1000 : 600);
     return;
   }
