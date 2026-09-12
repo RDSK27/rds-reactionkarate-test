@@ -354,7 +354,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v1</div>
+    <div class="app-ver">v2</div>
     </div>
 
   </main>
@@ -856,10 +856,10 @@ function kSetStatus(t,cls){ kStatus.textContent=t; kStatus.className='k-status'+
 
 function kLayout(name, tech, mirror){
   var sp=K_SPR[name], SW=kStage.clientWidth, SH=kStage.clientHeight;
-  var scale=Math.min(SH*0.94/sp.h, SW*0.96/sp.w);
+  var scale=Math.min(SH*0.76/sp.h, SW*0.96/sp.w);
   if(tech && tech.sc) scale*=tech.sc;
   var dispW=sp.w*scale, dispH=sp.h*scale;
-  var floorY=SH*0.985, top=floorY-dispH;
+  var floorY=SH*0.80, top=floorY-dispH;
   var bodyF=mirror?(1-sp.cx):sp.cx;
   var left=SW/2 - dispW*bodyF;
   var ringX=null, ringY=null;
