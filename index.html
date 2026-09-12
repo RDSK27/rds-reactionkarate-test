@@ -375,7 +375,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v16</div>
+    <div class="app-ver">v17</div>
     </div>
 
   </main>
@@ -953,8 +953,12 @@ var C_AMAGO_POINTS = {
   block_low:[0.69,0.39], cover:[0.529,0.145]
 };
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
-var C_WIN_PICO = 300;    // ms para entrar al hueco tras un pique
-var C_WIN_PARAR = 250;   // ms para contraatacar tras parar una técnica del rival
+/* Baremos de Combate más fáciles que Defensa/Ataque mientras se prueba el
+   modo completo -- el usuario pidió +100ms en todo para probar, se irá
+   afinando más adelante. */
+var C_EXTRA_MS = 100;     // margen extra sobre kWindow() para el ataque real del rival en Combate
+var C_WIN_PICO = 400;    // ms para entrar al hueco tras un pique (antes 300)
+var C_WIN_PARAR = 350;   // ms para contraatacar tras parar una técnica del rival (antes 250)
 
 var K_HITS = {
   atk_jab:[0.785,0.187], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
@@ -1230,14 +1234,14 @@ function cBeginAttack(){
   kRing.className='k-ring on';
   kSetStatus('¡Ataca!','go');
   C.t0=performance.now();
-  var win = kWindow()+K_GRACE;
+  var win = kWindow()+C_EXTRA_MS+K_GRACE;
   C.timer=setTimeout(function(){ cResolveAttack(null); }, win);
 }
 function cResolveAttack(tap){
   if(C.state!=='rival_attack') return;
   clearTimeout(C.timer);
   var tech=C.pending;
-  var ok = tap && tap.onTarget && tap.dt<=kWindow();
+  var ok = tap && tap.onTarget && tap.dt<=kWindow()+C_EXTRA_MS;
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
   kSetStatus('¡Parado! · '+Math.round(tap.dt)+' ms','ok');
