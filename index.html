@@ -373,7 +373,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v9</div>
+    <div class="app-ver">v10</div>
     </div>
 
   </main>
@@ -1151,7 +1151,8 @@ function cActorColor(side){ return side===C.akaSide ? 'aka' : 'ao'; }
    (assets/<pose>_red.png / _blue.png, mismas dimensiones que el original
    -- kLayout calcula la posicion con el nombre normal y aqui solo se
    cambia el archivo pintado). */
-var C_BELT_POSES = ['guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover'];
+var C_BELT_POSES = ['guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover',
+  'atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee','kick_low','sweep_low'];
 function cBeltColor(){ return C.akaSide==='rival' ? 'red' : 'blue'; }
 function cShowPose(name, tech, mirror){
   kLayout(name, tech, mirror);
@@ -1189,7 +1190,7 @@ function cBeginAttack(){
   K.tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
   C.pending = K.tech;
   C.mirror = Math.random()<0.5;
-  kLayout(K.tech.s, K.tech, C.mirror);
+  cShowPose(K.tech.s, K.tech, C.mirror);
   kRing.className='k-ring on';
   kSetStatus('¡Ataca!','go');
   C.t0=performance.now();
