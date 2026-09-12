@@ -281,6 +281,11 @@ if('serviceWorker' in navigator){
   .k-status.point{ background:rgba(162,58,41,.96); font-size:1.05rem; }
   .k-status.pointao{ background:rgba(21,101,216,.94); font-size:1.05rem; }
   .k-status.end{ background:rgba(17,17,17,.96); font-size:1.05rem; letter-spacing:.08em; }
+  /* En Combate el texto va a la altura del pecho del rival (delante de él,
+     donde el jugador ya tiene la vista puesta) en vez de arriba del todo. */
+  .cmb-mode .k-status{ top:38%; left:6%; right:6%; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.4); }
+  .k-status.pop{ animation:kStatusPop .38s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes kStatusPop{ 0%{transform:scale(1);} 40%{transform:scale(1.22);} 100%{transform:scale(1);} }
   .c-controls{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 14px; flex-shrink:0; }
   .c-amago-btn{ background:#333; color:#fff; border:0; border-radius:6px; padding:12px 20px; font-weight:900;
     display:flex; align-items:center; gap:12px; cursor:pointer; }
@@ -375,7 +380,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v17</div>
+    <div class="app-ver">v18</div>
     </div>
 
   </main>
@@ -989,7 +994,17 @@ var kStage, kKata, kRing, kMark, kStatus;
 function kEls(){
   kStage=$('kStage'); kKata=$('kKata'); kRing=$('kRing'); kMark=$('kMark'); kStatus=$('kStatus');
 }
-function kSetStatus(t,cls){ kStatus.textContent=t; kStatus.className='k-status'+(cls?' '+cls:''); }
+function kSetStatus(t,cls){
+  kStatus.textContent=t;
+  kStatus.style.display = t ? '' : 'none';
+  var cmb = kMode()==='cmb';
+  kStatus.className='k-status'+(cls?' '+cls:'');
+  if(cmb && t){
+    kStatus.classList.remove('pop');
+    void kStatus.offsetWidth; // fuerza reflow para reiniciar la animación aunque se repita la misma clase
+    kStatus.classList.add('pop');
+  }
+}
 
 function kLayout(name, tech, mirror){
   var sp=K_SPR[name], SW=kStage.clientWidth, SH=kStage.clientHeight;
@@ -1023,6 +1038,7 @@ function kStart(){
   $('kHudNormal').style.display = cmb ? 'none' : 'flex';
   $('cHud').style.display = cmb ? 'flex' : 'none';
   $('cControls').style.display = cmb ? 'flex' : 'none';
+  kStage.classList.toggle('cmb-mode', cmb);
   if(cmb){ cStart(); return; }
   K.total = parseInt(selVal('seg2'),10)||25;
   K.pace  = selVal('seg3')||'cont';
@@ -1186,16 +1202,13 @@ function cResumeTimer(){
 function cPauseTimer(){ C.paused=true; }
 function cActorColor(side){ return side===C.akaSide ? 'aka' : 'ao'; }
 
-/* Posturas de guardia con variante de cinturon recoloreado de verdad
-   (assets/<pose>_red.png / _blue.png, mismas dimensiones que el original
-   -- kLayout calcula la posicion con el nombre normal y aqui solo se
-   cambia el archivo pintado). */
-var C_BELT_POSES = ['guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover',
-  'atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee','kick_low','sweep_low'];
-function cBeltColor(){ return C.akaSide==='rival' ? 'red' : 'blue'; }
+/* El cinturón coloreado Aka/Ao se probó dos veces (recolor por píxeles y
+   recolor vía Gemini) y ninguna quedó lo bastante nítida/limpia comparada
+   con el sprite original -- se volvió al cinturón negro de siempre en
+   Combate también. cShowPose queda como alias fino de kLayout por si se
+   retoma más adelante con otra técnica. */
 function cShowPose(name, tech, mirror){
   kLayout(name, tech, mirror);
-  if(C_BELT_POSES.indexOf(name)>=0){ kKata.src = K_DIR+name+'_'+cBeltColor()+'.png'; }
 }
 /* pinta un aro en (hx,hy) del sprite ya mostrado (sin recalcular kLayout) */
 function cRingAt(hx, hy, mirror){
