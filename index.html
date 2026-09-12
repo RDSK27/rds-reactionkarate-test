@@ -251,7 +251,7 @@ if('serviceWorker' in navigator){
     background:linear-gradient(180deg,#dfe3e6,#c4c8cb); }
   .k-stage{ position:relative; width:100%; max-width:330px; aspect-ratio:3/4; overflow:hidden;
     border:3px solid var(--negro); box-shadow:0 6px 16px rgba(0,0,0,.4);
-    background:url('assets/bg_tatami.jpg?v=1') center/cover no-repeat; }
+    background:url('assets/bg_tatami.jpg?v=1') 50% 100%/318% 130% no-repeat; }
   .k-kata{ position:absolute; left:0; top:0; will-change:left,top,transform; }
   .k-status{ position:absolute; top:0; left:0; right:0; padding:6px 0; text-align:center; z-index:5;
     font-weight:900; letter-spacing:.14em; text-transform:uppercase; font-size:.82rem; color:#fff; background:rgba(17,17,17,.8); }
@@ -856,10 +856,10 @@ function kSetStatus(t,cls){ kStatus.textContent=t; kStatus.className='k-status'+
 
 function kLayout(name, tech, mirror){
   var sp=K_SPR[name], SW=kStage.clientWidth, SH=kStage.clientHeight;
-  var scale=Math.min(SH*0.76/sp.h, SW*0.96/sp.w);
+  var scale=Math.min(SH*0.67/sp.h, SW*0.96/sp.w);
   if(tech && tech.sc) scale*=tech.sc;
   var dispW=sp.w*scale, dispH=sp.h*scale;
-  var floorY=SH*0.80, top=floorY-dispH;
+  var floorY=SH*0.72, top=floorY-dispH;
   var bodyF=mirror?(1-sp.cx):sp.cx;
   var left=SW/2 - dispW*bodyF;
   var ringX=null, ringY=null;
