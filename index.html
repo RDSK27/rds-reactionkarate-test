@@ -380,7 +380,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v18</div>
+    <div class="app-ver">v19</div>
     </div>
 
   </main>
@@ -1137,7 +1137,6 @@ function kFinish(){
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
           amagoUsed:0, amagoTotal:0 };
-var C_ZONE_LABEL = { cabeza:'Cabeza', torso:'Torso', costado_izq:'Costado izquierdo', costado_der:'Costado derecho', piernas:'Piernas' };
 var C_TERM = { yuko:'Yuko', 'waza-ari':'Waza-ari', ippon:'Ippon' };
 /* Valor (yuko/waza-ari/ippon) de un acierto de amago (por postura) o de
    contraataque tras parar (por técnica) -- calibrado en calibrar.html. */
@@ -1245,7 +1244,6 @@ function cBeginAttack(){
   C.mirror = Math.random()<0.5;
   cShowPose(K.tech.s, K.tech, C.mirror);
   kRing.className='k-ring on';
-  kSetStatus('¡Ataca!','go');
   C.t0=performance.now();
   var win = kWindow()+C_EXTRA_MS+K_GRACE;
   C.timer=setTimeout(function(){ cResolveAttack(null); }, win);
@@ -1257,13 +1255,11 @@ function cResolveAttack(tap){
   var ok = tap && tap.onTarget && tap.dt<=kWindow()+C_EXTRA_MS;
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
-  kSetStatus('¡Parado! · '+Math.round(tap.dt)+' ms','ok');
   var ctr = C_COUNTERS[tech.s];
   if(!ctr){ C.state='cooldown'; C.timer=setTimeout(cParado, 900); return; }
   C.state='counter_window';
   cRingAt(ctr[0], ctr[1], C.mirror);
   kRing.className='k-ring on';
-  kSetStatus('¡Contraataca!','go');
   C.t0=performance.now();
   C.timer=setTimeout(function(){ cResolveCounter(null); }, C_WIN_PARAR);
 }
@@ -1287,7 +1283,6 @@ function cAmagoStart(){
   $('cAmagoBtn').disabled=true;
   cPauseTimer();
   kRing.className='k-ring'; kMark.className='k-mark';
-  kSetStatus('COMBATE PARADO','hajime');
 }
 function cNearestAmagoPose(hxF, hyF){
   var best=null, bestD=Infinity;
@@ -1313,7 +1308,6 @@ function cResolveAmagoAim(ev){
 function cPickPose(pose){
   C.paused=false;
   var hit = A_HITS[pose];
-  var zone = C_DEFENDS[pose];
   var mirror = Math.random()<0.5; // espejo independiente de la postura de defensa, otro despiste más
   C.state='pico_window';
   C.pending = { pose:pose, hit:hit };
@@ -1325,7 +1319,6 @@ function cPickPose(pose){
   } else {
     kRing.className='k-ring';
   }
-  kSetStatus(zone ? ('¡'+C_ZONE_LABEL[zone]+'!') : '¡Amago!', 'go');
   C.t0=performance.now();
   C.timer=setTimeout(function(){ cResolvePico(null); }, C_WIN_PICO);
 }
