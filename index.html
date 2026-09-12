@@ -354,7 +354,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v5</div>
+    <div class="app-ver">v6</div>
     </div>
 
   </main>
@@ -856,7 +856,7 @@ Object.keys(K_SPR).forEach(function(k){ var im=new Image(); im.src=K_DIR+k+".png
 var A_HITS = {
   guard_chest:[0.497,0.12], guard_flank:[0.503,0.115], guard_temple:[0.611,0.133],
   guard_low:[0.5,0.13], block_side:[0.6,0.113], block_high:[0.695,0.351],
-  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.247,0.393]],
+  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[0.753,0.393],
   guard_base:null, guard_closed:null
 };
 var A_NAMES = {
@@ -873,8 +873,37 @@ function aPickHit(spec){
 }
 var A_TECHS = A_POOL.map(function(k){ return { s:k, hitSpec:A_HITS[k], name:A_NAMES[k] }; });
 
+/* ---- Modo Combate (datos; el bucle de juego aún no está montado) ----
+   C_VALUES: valor Yuko/Waza-ari/Ippon de cada técnica de K_POOL si conecta.
+   C_COUNTERS: punto de contraataque tras pararla (null = no deja hueco).
+   C_DEFENDS: zona que defiende cada guardia (el pique que la provoca).
+     "izquierda/derecha" = lado de PANTALLA tal cual se ve la imagen sin
+     espejar (no el lado anatómico del rival) — por eso estas posturas no
+     se deben espejar al azar en Combate, para que coincida siempre con
+     lo calibrado. */
+var C_VALUES = {
+  atk_jab:'yuko', atk_cross:'yuko', atk_combo:'yuko', kick_front:'waza-ari',
+  kick_mid:'waza-ari', kick_high:'ippon', knee:'waza-ari', kick_low:'waza-ari', sweep_low:'yuko'
+};
+var C_COUNTERS = {
+  atk_jab:[0.473,0.112], atk_cross:[0.505,0.083], atk_combo:[0.618,0.082], kick_front:[0.49,0.097],
+  kick_mid:[0.399,0.112], kick_high:[0.451,0.127], knee:[0.635,0.112], kick_low:null, sweep_low:null
+};
+var C_DEFENDS = {
+  guard_base:'cabeza', guard_closed:'cabeza', guard_chest:'costado_izq', guard_flank:'costado_der',
+  guard_temple:'costado_der', guard_low:'piernas', block_side:'torso', block_high:'cabeza',
+  block_cross:'costado_izq', block_low:'torso', cover:'cabeza'
+};
+var C_ZONE_POSES = {}; // agrupa guardias por zona defendida, para elegir una al azar cuando el jugador amaga esa zona
+Object.keys(C_DEFENDS).forEach(function(k){
+  var z = C_DEFENDS[k]; if(!z) return;
+  (C_ZONE_POSES[z] = C_ZONE_POSES[z]||[]).push(k);
+});
+var C_WIN_PICO = 300;    // ms para entrar al hueco tras un pique
+var C_WIN_PARAR = 250;   // ms para contraatacar tras parar una técnica del rival
+
 var K_HITS = {
-  atk_jab:[0.821,0.168], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
+  atk_jab:[0.785,0.187], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
   kick_front:[0.51,0.36], kick_mid:[0.743,0.396], kick_high:[0.909,0.108], knee:[0.784,0.435],
   kick_low:[0.222,0.661], sweep_low:[0.116,0.875]
 };
