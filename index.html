@@ -303,7 +303,7 @@ if('serviceWorker' in navigator){
 
     <div class="segment" id="seg3">
       <button class="sel" data-v="cont">Seguido</button>
-      <button data-v="paus">Con pausa</button>
+      <button data-v="paus">Espera</button>
     </div>
 
     <div style="border:3px solid #b03020;border-radius:10px;background-color:#000000;padding:20px 12px 12px;display:flex;flex-direction:column;align-items:center;width:92%;min-height:250px;box-sizing:border-box;margin:auto auto 28px;">
@@ -449,7 +449,7 @@ if('serviceWorker' in navigator){
       </div>
       <div class="rank-tabs" id="seg3R">
         <button class="rank-tab" data-v="cont">Seguido</button>
-        <button class="rank-tab" data-v="paus">Con pausa</button>
+        <button class="rank-tab" data-v="paus">Espera</button>
       </div>
       <div id="rkList" class="rank-full-list"></div>
     </div>
@@ -887,9 +887,11 @@ var K_POOL = ['atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_hi
 var K_SC   = { sweep_low:1.25 };
 var K_TECHS = K_POOL.map(function(k){ return { s:k, hx:K_HITS[k][0], hy:K_HITS[k][1], name:K_NAMES[k], sc:(K_SC[k]||1) }; });
 
-var K_WINDOW = 620;   // ms para llegar a defender
+var K_WINDOW_CONT = 475; // ms para llegar a defender/atacar en "Seguido"
+var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar en "Espera"
 var K_GRACE  = 320;   // margen antes del punto automático
 var K_PENALTY = 1200; // ms que cuenta un punto encajado en la media
+function kWindow(){ return K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT; }
 
 var K = { state:'idle', timer:0, rep:0, total:0, pace:'cont', def:0, pt:0, tech:null, mirror:false, t0:0 };
 var kStage, kKata, kRing, kMark, kStatus;
@@ -972,7 +974,7 @@ function kFire(){
   kSetStatus(kMode()==='atk' ? '¡Ataca!' : '¡Defiende!', 'go');
   K.t0=performance.now();
   K.state='go';
-  K.timer=setTimeout(function(){ kResolve(null); }, K_WINDOW+K_GRACE);
+  K.timer=setTimeout(function(){ kResolve(null); }, kWindow()+K_GRACE);
 }
 function kResolve(tap){
   if(K.state!=='go') return;
@@ -986,7 +988,7 @@ function kResolve(tap){
     ms = ok ? A_GUARD_MS : K_PENALTY;
     why = ok ? 'Guardia cerrada · no atacaste' : 'Te contragolpearon';
   } else {
-    ok = tap && tap.onTarget && tap.dt<=K_WINDOW;
+    ok = tap && tap.onTarget && tap.dt<=kWindow();
     ms = ok ? Math.round(tap.dt) : K_PENALTY;
     why = ok ? Math.round(tap.dt)+' ms'
       : (!tap ? 'Sin reacción' : (!tap.onTarget ? 'Fallaste el punto' : 'Tarde ('+Math.round(tap.dt)+' ms)'));
