@@ -871,7 +871,8 @@ function aPickHit(spec){
   if(spec==null) return null;
   return Array.isArray(spec[0]) ? spec[Math.floor(Math.random()*spec.length)] : spec;
 }
-var A_TECHS = A_POOL.map(function(k){ return { s:k, hitSpec:A_HITS[k], name:A_NAMES[k] }; });
+var A_TECHS = A_POOL.map(function(k){ return { s:k, hitSpec:A_HITS[k], name:A_NAMES[k] }; })
+  .concat([{ s:'guard_base', name:'Movimiento', guard:true, move:true }]);
 
 var K_HITS = {
   atk_jab:[0.821,0.168], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
@@ -885,13 +886,18 @@ var K_NAMES = {
 };
 var K_POOL = ['atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee','kick_low','sweep_low'];
 var K_SC   = { sweep_low:1.25 };
-var K_TECHS = K_POOL.map(function(k){ return { s:k, hx:K_HITS[k][0], hy:K_HITS[k][1], name:K_NAMES[k], sc:(K_SC[k]||1) }; });
+var K_WINBONUS = { kick_low:50, sweep_low:100 }; // ms extra de margen para técnicas más difíciles de ver venir
+var K_TECHS = K_POOL.map(function(k){ return { s:k, hx:K_HITS[k][0], hy:K_HITS[k][1], name:K_NAMES[k], sc:(K_SC[k]||1), winBonus:(K_WINBONUS[k]||0) }; })
+  .concat([{ s:'guard_base', name:'Movimiento', guard:true, move:true }]);
 
 var K_WINDOW_CONT = 475; // ms para llegar a defender/atacar en "Seguido"
 var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar en "Espera"
 var K_GRACE  = 320;   // margen antes del punto automático
 var K_PENALTY = 1200; // ms que cuenta un punto encajado en la media
-function kWindow(){ return K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT; }
+function kWindow(){
+  var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
+  return base + (K.tech && K.tech.winBonus || 0);
+}
 
 var K = { state:'idle', timer:0, rep:0, total:0, pace:'cont', def:0, pt:0, tech:null, mirror:false, t0:0 };
 var kStage, kKata, kRing, kMark, kStatus;
@@ -902,6 +908,7 @@ function kEls(){
 function kSetStatus(t,cls){ kStatus.textContent=t; kStatus.className='k-status'+(cls?' '+cls:''); }
 
 function kLayout(name, tech, mirror){
+  kKata.style.transition='none';
   var sp=K_SPR[name], SW=kStage.clientWidth, SH=kStage.clientHeight;
   var scale=Math.min(SH*0.85/sp.h, SW*0.96/sp.w);
   if(tech && tech.sc) scale*=tech.sc;
@@ -922,6 +929,28 @@ function kLayout(name, tech, mirror){
   kKata.style.left=left+'px'; kKata.style.top=top+'px';
   kKata.style.transform=mirror?'scaleX(-1)':'none';
   if(ringX!=null){ kRing.style.left=ringX+'px'; kRing.style.top=ringY+'px'; }
+}
+
+/* Amago de desplazamiento: parte de guardia base y se desliza durante la
+   ventana de reacción. No hay diana — si el jugador toca, falla (cree que
+   viene algo y no era nada); si no toca, acierto. Usa CSS transition en vez
+   de recalcular kLayout en cada frame. */
+var MOVE_DIRS = ['fwd','back','left','right'];
+var MOVE_NAMES = { fwd:'Avanza', back:'Retrocede', left:'Se desplaza (izq.)', right:'Se desplaza (der.)' };
+function kAnimateMove(dir, ms){
+  kLayout('guard_base', null, K.mirror);
+  var left=parseFloat(kKata.style.left), top=parseFloat(kKata.style.top);
+  var w=parseFloat(kKata.style.width), h=parseFloat(kKata.style.height);
+  var SW=kStage.clientWidth;
+  var nLeft=left, nW=w, nH=h, nTop=top;
+  if(dir==='left'){ nLeft = left - SW*0.16; }
+  else if(dir==='right'){ nLeft = left + SW*0.16; }
+  else if(dir==='fwd'){ nW=w*1.15; nH=h*1.15; nLeft=left-(nW-w)/2; nTop=(top+h)-nH; }
+  else if(dir==='back'){ nW=w*0.86; nH=h*0.86; nLeft=left-(nW-w)/2; nTop=(top+h)-nH; }
+  kKata.getBoundingClientRect(); // fuerza reflow para que la transition arranque desde el estado actual
+  kKata.style.transition = 'left '+ms+'ms linear, top '+ms+'ms linear, width '+ms+'ms linear, height '+ms+'ms linear';
+  kKata.style.left=nLeft+'px'; kKata.style.top=nTop+'px';
+  kKata.style.width=nW+'px'; kKata.style.height=nH+'px';
 }
 
 function kAbort(){ clearTimeout(K.timer); K.state='idle'; }
@@ -962,31 +991,39 @@ function kFire(){
   var atk = kMode()==='atk';
   var pool = atk ? A_TECHS : K_TECHS;
   var picked = pool[Math.floor(Math.random()*pool.length)];
-  if(atk){
+  if(picked.move){
+    K.tech = { s:picked.s, name:picked.name, guard:true, move:MOVE_DIRS[Math.floor(Math.random()*MOVE_DIRS.length)] };
+  } else if(atk){
     var hp = aPickHit(picked.hitSpec);
     K.tech = { s:picked.s, name:picked.name, hx:hp?hp[0]:null, hy:hp?hp[1]:null, guard:!hp };
   } else {
     K.tech = picked;
   }
   K.mirror = Math.random()<0.5;
-  kLayout(K.tech.s, K.tech, K.mirror);
+  var winMs = kWindow()+K_GRACE;
+  if(K.tech.move){ kAnimateMove(K.tech.move, winMs); }
+  else{ kLayout(K.tech.s, K.tech, K.mirror); }
   kRing.className = K.tech.guard ? 'k-ring' : 'k-ring on';
-  kSetStatus(kMode()==='atk' ? '¡Ataca!' : '¡Defiende!', 'go');
+  kSetStatus(K.tech.move ? MOVE_NAMES[K.tech.move] : (atk ? '¡Ataca!' : '¡Defiende!'), 'go');
   K.t0=performance.now();
   K.state='go';
-  K.timer=setTimeout(function(){ kResolve(null); }, kWindow()+K_GRACE);
+  K.timer=setTimeout(function(){ kResolve(null); }, winMs);
 }
 function kResolve(tap){
   if(K.state!=='go') return;
   clearTimeout(K.timer);
   K.state='done';
   var atk = kMode()==='atk';
-  var isGuard = atk && K.tech.guard;
+  var isGuard = !!K.tech.guard;
   var ok, ms, why;
   if(isGuard){
-    ok = !tap; // posición de guardia: sin sitio de ataque, lo correcto es NO tocar
+    ok = !tap; // amago (guardia sin apertura o simple desplazamiento): lo correcto es NO tocar
     ms = ok ? A_GUARD_MS : K_PENALTY;
-    why = ok ? 'Guardia cerrada · no atacaste' : 'Te contragolpearon';
+    if(K.tech.move){
+      why = ok ? 'Solo era movimiento' : (atk ? 'Te contragolpearon' : 'Reaccionaste a nada');
+    } else {
+      why = ok ? 'Guardia cerrada · no atacaste' : 'Te contragolpearon';
+    }
   } else {
     ok = tap && tap.onTarget && tap.dt<=kWindow();
     ms = ok ? Math.round(tap.dt) : K_PENALTY;
