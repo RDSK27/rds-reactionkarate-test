@@ -34,10 +34,23 @@
   .handle:active{cursor:grabbing;}
   .handle.pt1{border-color:#1565d8;background:rgba(21,101,216,.12);}
   .handle.pt1::after{background:#1565d8;}
+  .handle.counter{border-color:#1a7a35;background:rgba(26,122,53,.14);border-style:solid;}
+  .handle.counter::after{background:#1a7a35;}
   .handle .rm{position:absolute;top:-9px;right:-9px;width:18px;height:18px;border-radius:50%;background:#111;
     color:#fff;font-size:.6rem;line-height:18px;text-align:center;cursor:pointer;}
   .addpt{margin-top:6px;background:#333;color:#fff;border:0;border-radius:4px;font-size:.62rem;
     font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;cursor:pointer;}
+  .fld{margin-top:8px;padding-top:8px;border-top:1px dashed #ccc;}
+  .fld-lbl{font-size:.6rem;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:#777;margin-bottom:3px;}
+  .fld select{width:100%;max-width:150px;font-size:.68rem;padding:4px;border:1px solid #999;border-radius:4px;background:#fff;}
+  .valrow{display:flex;gap:4px;margin-top:2px;}
+  .valrow label{flex:1;text-align:center;font-size:.6rem;font-weight:900;text-transform:uppercase;
+    border:1px solid #999;border-radius:4px;padding:5px 2px;cursor:pointer;color:#555;}
+  .valrow input{display:none;}
+  .valrow input:checked + span{color:#fff;}
+  .valrow label:has(input:checked){background:var(--rojo);border-color:var(--rojo);color:#fff;}
+  .counterchk{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.66rem;color:#333;max-width:150px;line-height:1.25;}
+  .counterchk input{flex:none;width:15px;height:15px;}
   footer{position:fixed;left:0;right:0;bottom:0;background:#000;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     display:flex;gap:8px;align-items:center;z-index:20;border-top:4px solid var(--rojo2);}
   footer button{background:var(--rojo);color:#fff;border:0;border-radius:4px;font-weight:900;letter-spacing:.08em;
@@ -51,7 +64,9 @@
 <body>
 <header>
   <b>Calibrar dianas</b>
-  <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Si una postura no deja ninguna zona abierta (está defendiendo todo / en guardia), marca la casilla "Sin sitio de ataque" en vez de poner un aro — esas quedan como posiciones de guardia (útiles para Modo Combate). Luego pulsa EXPORTAR y me pegas el texto.</p>
+  <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Si una postura no deja ninguna zona abierta (está defendiendo todo / en guardia), marca la casilla "Sin sitio de ataque" en vez de poner un aro.<br><br>
+  <b>Nuevo para Modo Combate</b> — En cada ataque: marca su valor (Yuko/Waza-ari/Ippon) y, si al pararlo dejas al rival con algún hueco para contraatacar, el punto verde de "Punto de contraataque" (si no expone nada, marca "Sin contraataque"). En cada guardia/defensa: elige qué zona defiende (el pique que provoca que el rival adopte esa postura).<br><br>
+  Luego pulsa EXPORTAR y me pegas el texto.</p>
 </header>
 <div id="list"></div>
 <p class="tip" id="progress"></p>
@@ -64,10 +79,10 @@
 <script>
 var STAGE_H = 300;
 var GROUPS = [
-  { title:'Ataques — toca el puño / el pie que golpea', items:[
+  { title:'Ataques — toca el puño / el pie que golpea', type:'atk', items:[
     'atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee',
     'kick_low','sweep_low' ] },
-  { title:'Guardias y defensas — toca la zona abierta a atacar (Modo Ataque)', items:[
+  { title:'Guardias y defensas — toca la zona abierta a atacar (Modo Ataque)', type:'guard', items:[
     'guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low',
     'block_side','block_high','block_cross','block_low','cover' ] }
 ];
@@ -80,13 +95,30 @@ var DEFAULTS = {
   block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.247,0.393]],
   guard_base:null, guard_closed:null
 };
-var LSKEY = 'rds_karate_dianas_v2';
-var saved = {};
-try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e){}
+var VALUES = [['yuko','Yuko'],['waza-ari','Waza-ari'],['ippon','Ippon']];
+var DEFAULT_VALUE = {
+  atk_jab:'yuko', atk_cross:'yuko', atk_combo:'yuko', kick_front:'waza-ari',
+  kick_mid:'waza-ari', kick_high:'ippon', knee:'waza-ari', kick_low:'waza-ari', sweep_low:'ippon'
+};
+var ZONES = [['','— sin elegir —'],['cabeza','Cabeza'],['torso','Torso'],
+  ['costado_izq','Costado izquierdo'],['costado_der','Costado derecho'],['piernas','Piernas']];
+var DEFAULT_DEFEND = {}; // sin defaults -- lo decide el usuario, no adivinar como con las dianas de Ataque
+
+var LSKEY = 'rds_karate_dianas_v3';
+var LSKEY_OLD = 'rds_karate_dianas_v2';
+var saved = { pts:{}, counter:{}, value:{}, defend:{} };
+try {
+  var v3 = JSON.parse(localStorage.getItem(LSKEY) || 'null');
+  if(v3){ saved = v3; }
+  else {
+    var v2 = JSON.parse(localStorage.getItem(LSKEY_OLD) || '{}'); // migra solo los puntos de la version anterior
+    saved.pts = v2;
+  }
+} catch(e){}
 
 var MANIFEST = [{"name":"guard_base","w":168,"h":332},{"name":"atk_jab","w":168,"h":334},{"name":"atk_cross","w":185,"h":334},{"name":"atk_combo","w":179,"h":332},{"name":"atk_elbow","w":181,"h":349},{"name":"kick_front","w":168,"h":353},{"name":"kick_mid","w":170,"h":348},{"name":"kick_high","w":179,"h":354},{"name":"knee","w":140,"h":340},{"name":"kick_low","w":276,"h":348},{"name":"sweep_low","w":359,"h":259},{"name":"guard_closed","w":168,"h":333},{"name":"guard_chest","w":167,"h":335},{"name":"guard_flank","w":179,"h":334},{"name":"guard_temple","w":179,"h":333},{"name":"block_side","w":180,"h":349},{"name":"guard_low","w":178,"h":340},{"name":"block_high","w":179,"h":351},{"name":"block_cross","w":176,"h":348},{"name":"block_low","w":125,"h":340},{"name":"cover","w":157,"h":345},{"name":"evade_back","w":186,"h":243}];
 var META = {};
-var pts = {};
+var pts = {}, counterPts = {}, values = {}, defends = {};
 MANIFEST.forEach(function(s){ META[s.name] = s; });
 build();
 
@@ -103,10 +135,15 @@ function build(){
     var h = document.createElement('div'); h.className='grouphdr'; h.textContent=g.title; list.appendChild(h);
     g.items.forEach(function(name){
       var meta = META[name]; if(!meta) return;
-      var has = Object.prototype.hasOwnProperty.call(saved,name);
-      var raw = has ? saved[name] : (DEFAULTS[name]!==undefined ? DEFAULTS[name] : [0.5,0.5]);
+      var has = Object.prototype.hasOwnProperty.call(saved.pts||{},name);
+      var raw = has ? saved.pts[name] : (DEFAULTS[name]!==undefined ? DEFAULTS[name] : [0.5,0.5]);
       pts[name] = normPts(raw);
       var lastPts = pts[name] || [[0.5,0.5]]; // recuerda los ultimos puntos para restaurar si se desmarca
+      values[name] = (saved.value&&saved.value[name]) || DEFAULT_VALUE[name] || 'yuko';
+      defends[name] = (saved.defend&&saved.defend[name]!=null) ? saved.defend[name] : (DEFAULT_DEFEND[name]||'');
+      var cpRaw = saved.counter && Object.prototype.hasOwnProperty.call(saved.counter,name) ? saved.counter[name] : undefined;
+      counterPts[name] = cpRaw!==undefined ? cpRaw : null;
+      var lastCounter = counterPts[name] || [0.5,0.5];
 
       var card = document.createElement('div'); card.className='card';
       var col = document.createElement('div');
@@ -117,6 +154,40 @@ function build(){
       chkWrap.appendChild(chk); chkWrap.appendChild(document.createTextNode('Sin sitio de ataque (guardia)'));
       var addBtn = document.createElement('button'); addBtn.type='button'; addBtn.className='addpt'; addBtn.textContent='+ Punto alternativo';
       col.appendChild(nm); col.appendChild(ro); col.appendChild(chkWrap); col.appendChild(addBtn);
+
+      var valSel=null, ctrChk=null, ctrRo=null, defSel=null;
+      if(g.type==='atk'){
+        var valFld = document.createElement('div'); valFld.className='fld';
+        var valLbl = document.createElement('div'); valLbl.className='fld-lbl'; valLbl.textContent='Valor si conecta';
+        var valrow = document.createElement('div'); valrow.className='valrow';
+        VALUES.forEach(function(v){
+          var lab=document.createElement('label');
+          var inp=document.createElement('input'); inp.type='radio'; inp.name='val_'+name; inp.value=v[0];
+          inp.checked = values[name]===v[0];
+          var sp=document.createElement('span'); sp.textContent=v[1];
+          lab.appendChild(inp); lab.appendChild(sp);
+          inp.addEventListener('change', function(){ values[name]=v[0]; persist(); });
+          valrow.appendChild(lab);
+        });
+        valFld.appendChild(valLbl); valFld.appendChild(valrow); col.appendChild(valFld);
+
+        var ctrFld = document.createElement('div'); ctrFld.className='fld';
+        var ctrLbl = document.createElement('div'); ctrLbl.className='fld-lbl'; ctrLbl.textContent='Contraataque tras pararlo';
+        ctrChk = document.createElement('label'); ctrChk.className='counterchk';
+        var ctrInp = document.createElement('input'); ctrInp.type='checkbox';
+        ctrChk.appendChild(ctrInp); ctrChk.appendChild(document.createTextNode('Sin contraataque'));
+        ctrRo = document.createElement('div'); ctrRo.className='readout';
+        ctrFld.appendChild(ctrLbl); ctrFld.appendChild(ctrChk); ctrFld.appendChild(ctrRo); col.appendChild(ctrFld);
+        ctrChk._input = ctrInp;
+      } else if(g.type==='guard'){
+        var defFld = document.createElement('div'); defFld.className='fld';
+        var defLbl = document.createElement('div'); defLbl.className='fld-lbl'; defLbl.textContent='¿Qué defiende? (pico que la provoca)';
+        defSel = document.createElement('select');
+        ZONES.forEach(function(z){ var o=document.createElement('option'); o.value=z[0]; o.textContent=z[1]; defSel.appendChild(o); });
+        defSel.value = defends[name];
+        defSel.addEventListener('change', function(){ defends[name]=defSel.value; persist(); });
+        defFld.appendChild(defLbl); defFld.appendChild(defSel); col.appendChild(defFld);
+      }
 
       var w = STAGE_H * (meta.w/meta.h);
       var stage = document.createElement('div'); stage.className='stage';
@@ -164,11 +235,38 @@ function build(){
         });
       }
 
+      var counterHandle = null;
+      function rebuildCounterHandle(){
+        if(counterHandle){ counterHandle.remove(); counterHandle=null; }
+        if(g.type!=='atk' || counterPts[name]===null) return;
+        counterHandle = document.createElement('div'); counterHandle.className='handle counter';
+        var dragging=false;
+        function fromEvent(ev){
+          var r = stage.getBoundingClientRect();
+          counterPts[name][0] = Math.max(0, Math.min(1, (ev.clientX-r.left)/r.width));
+          counterPts[name][1] = Math.max(0, Math.min(1, (ev.clientY-r.top)/r.height));
+          lastCounter = counterPts[name].slice();
+          place();
+        }
+        counterHandle.addEventListener('pointerdown', function(ev){ dragging=true; counterHandle.setPointerCapture(ev.pointerId); ev.preventDefault(); ev.stopPropagation(); });
+        counterHandle.addEventListener('pointermove', function(ev){ if(dragging){ fromEvent(ev); } });
+        counterHandle.addEventListener('pointerup', function(ev){ dragging=false; persist(); });
+        stage.appendChild(counterHandle);
+      }
+
       function place(){
         var isGuard = pts[name]===null;
         chk.checked = isGuard;
         addBtn.style.display = isGuard ? 'none' : 'inline-block';
         stage.classList.toggle('is-guard', isGuard);
+        if(g.type==='atk'){
+          ctrChk._input.checked = counterPts[name]===null;
+          if(counterHandle){
+            counterHandle.style.left = (counterPts[name][0]*100)+'%';
+            counterHandle.style.top  = (counterPts[name][1]*100)+'%';
+          }
+          ctrRo.textContent = counterPts[name]===null ? 'sin contraataque' : ('hx '+counterPts[name][0].toFixed(3)+' hy '+counterPts[name][1].toFixed(3));
+        }
         if(isGuard){ ro.textContent = 'sin sitio de ataque'; return; }
         handles.forEach(function(hd){
           hd.el.style.left = (hd.pt[0]*100)+'%';
@@ -176,7 +274,14 @@ function build(){
         });
         ro.textContent = pts[name].map(function(p,i){ return 'p'+(i+1)+': hx '+p[0].toFixed(3)+' hy '+p[1].toFixed(3); }).join('   ');
       }
-      rebuildHandles(); place();
+      rebuildHandles(); rebuildCounterHandle(); place();
+
+      if(g.type==='atk'){
+        ctrChk._input.addEventListener('change', function(){
+          counterPts[name] = ctrChk._input.checked ? null : lastCounter.slice();
+          rebuildCounterHandle(); place(); persist();
+        });
+      }
 
       chk.addEventListener('change', function(){
         pts[name] = chk.checked ? null : lastPts.map(function(p){return p.slice();});
@@ -204,27 +309,37 @@ function build(){
 }
 
 function persist(){
-  try { localStorage.setItem(LSKEY, JSON.stringify(pts)); } catch(e){}
+  try { localStorage.setItem(LSKEY, JSON.stringify({pts:pts, counter:counterPts, value:values, defend:defends})); } catch(e){}
   updProgress();
 }
 function updProgress(){
-  var moved = 0, total = 0, guard = 0, multi = 0;
+  var moved = 0, total = 0, guard = 0, multi = 0, defended = 0, noCounter = 0;
   Object.keys(pts).forEach(function(k){
     total++;
-    if(pts[k]===null){ guard++; if(Object.prototype.hasOwnProperty.call(saved,k)) moved++; return; }
+    if(pts[k]===null){ guard++; return; }
     if(pts[k].length>1) multi++;
-    var d = JSON.stringify(normPts(DEFAULTS[k]!==undefined ? DEFAULTS[k] : [0.5,0.5]));
-    if(d!==JSON.stringify(pts[k]) || Object.prototype.hasOwnProperty.call(saved,k)) moved++;
   });
-  document.getElementById('progress').textContent = 'Ajustadas: '+moved+' / '+total+' · '+guard+' sin sitio de ataque · '+multi+' con puntos alternativos (se guardan solas)';
+  Object.keys(defends).forEach(function(k){ if(defends[k]) defended++; });
+  Object.keys(counterPts).forEach(function(k){ if(counterPts[k]===null) noCounter++; });
+  document.getElementById('progress').textContent = guard+' sin sitio de ataque · '+multi+' con puntos alternativos · '+
+    defended+'/'+Object.keys(defends).length+' guardias con "qué defiende" · '+noCounter+' ataques sin contraataque (se guarda solo al tocar)';
 }
 function exportAll(){
-  var o = {};
+  var hits = {};
   Object.keys(pts).forEach(function(k){
-    if(pts[k]===null){ o[k]=null; return; }
+    if(pts[k]===null){ hits[k]=null; return; }
     var rounded = pts[k].map(function(p){ return [ +p[0].toFixed(3), +p[1].toFixed(3) ]; });
-    o[k] = rounded.length===1 ? rounded[0] : rounded;
+    hits[k] = rounded.length===1 ? rounded[0] : rounded;
   });
+  var atkNames = GROUPS.filter(function(g){return g.type==='atk';})[0].items;
+  var guardNames = GROUPS.filter(function(g){return g.type==='guard';})[0].items;
+  var counters = {}, vals = {}, defs = {};
+  atkNames.forEach(function(k){
+    counters[k] = counterPts[k]===null ? null : [ +counterPts[k][0].toFixed(3), +counterPts[k][1].toFixed(3) ];
+    vals[k] = values[k];
+  });
+  guardNames.forEach(function(k){ defs[k] = defends[k]; });
+  var o = { hits:hits, values:vals, defends:defs, counters:counters };
   document.getElementById('out').value = JSON.stringify(o);
 }
 function copyOut(){
