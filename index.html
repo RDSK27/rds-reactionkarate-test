@@ -375,7 +375,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v7</div>
+    <div class="app-ver">v8</div>
     </div>
 
   </main>
@@ -974,7 +974,6 @@ var K_TECHS = K_POOL.map(function(k){ return { s:k, hx:K_HITS[k][0], hy:K_HITS[k
 var K_WINDOW_CONT = 475; // ms para llegar a defender/atacar en "Seguido"
 var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar en "Espera"
 var K_GRACE  = 320;   // margen antes del punto automático
-var K_PENALTY = 1200; // ms que cuenta un punto encajado en la media
 function kWindow(){
   var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
   return base + (K.tech && K.tech.winBonus || 0);
@@ -1076,25 +1075,22 @@ function kResolve(tap){
   K.state='done';
   var atk = kMode()==='atk';
   var isGuard = !!K.tech.guard;
-  var ok, ms, why;
+  var ok, why;
   if(isGuard){
     ok = !tap; // posición de guardia sin apertura: lo correcto es NO tocar
-    ms = ok ? A_GUARD_MS : K_PENALTY;
     why = ok ? 'Guardia cerrada · no atacaste' : 'Te contragolpearon';
   } else {
     ok = tap && tap.onTarget && tap.dt<=kWindow();
-    ms = ok ? Math.round(tap.dt) : K_PENALTY;
     why = ok ? Math.round(tap.dt)+' ms'
       : (!tap ? 'Sin reacción' : (!tap.onTarget ? 'Fallaste el punto' : 'Tarde ('+Math.round(tap.dt)+' ms)'));
   }
   if(ok){
     K.def++; S.kDef=K.def;
-    S.times.push(ms);
+    S.times.push(isGuard ? A_GUARD_MS : Math.round(tap.dt)); // los fallos no meten tiempo en la media, solo cuentan como fallo
     kRing.className = isGuard ? 'k-ring' : 'k-ring ok';
     kSetStatus((atk?'¡Acierto!':'Defendido')+' · '+why,'ok');
   } else {
     K.pt++;
-    S.times.push(ms);
     kRing.className = isGuard ? 'k-ring' : 'k-ring no';
     kSetStatus((atk?'Fallo':'Punto en contra')+' · '+why,'no');
   }
@@ -1323,7 +1319,6 @@ document.addEventListener('pointerdown', function(ev){
   if(K.state==='ready'){            // se adelantó
     clearTimeout(K.timer); K.state='done';
     K.pt++;
-    S.times.push(K_PENALTY);
     kRing.className='k-ring no'; kSetStatus('Te adelantaste','no');
     $('kHudPt').textContent=(kMode()==='atk'?'Fallos ':'Pts ')+K.pt;
     K.timer=setTimeout(kNext, K.pace==='paus' ? 1000 : 600);
