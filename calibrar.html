@@ -17,6 +17,13 @@
     display:flex;gap:10px;align-items:flex-start;}
   .name{font-weight:900;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;min-width:96px;}
   .readout{font-family:monospace;font-size:.72rem;color:#555;margin-top:4px;}
+  .guardchk{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:.66rem;color:#333;max-width:96px;line-height:1.25;}
+  .guardchk input{flex:none;width:15px;height:15px;}
+  .stage.is-guard{background:linear-gradient(180deg,#e9e4d8,#dcd2b8);}
+  .stage.is-guard img{opacity:.55;}
+  .guard-badge{position:absolute;top:4px;left:4px;right:4px;text-align:center;background:rgba(17,17,17,.78);
+    color:#fff;font-size:.6rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:3px 2px;border-radius:3px;display:none;}
+  .stage.is-guard .guard-badge{display:block;}
   .stage{position:relative;background:linear-gradient(180deg,#f3eee3,#e6ddc9);border:2px solid #111;
     flex:0 0 auto;touch-action:none;overflow:hidden;}
   .stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;}
@@ -25,6 +32,12 @@
     display:flex;align-items:center;justify-content:center;}
   .handle::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--rojo);}
   .handle:active{cursor:grabbing;}
+  .handle.pt1{border-color:#1565d8;background:rgba(21,101,216,.12);}
+  .handle.pt1::after{background:#1565d8;}
+  .handle .rm{position:absolute;top:-9px;right:-9px;width:18px;height:18px;border-radius:50%;background:#111;
+    color:#fff;font-size:.6rem;line-height:18px;text-align:center;cursor:pointer;}
+  .addpt{margin-top:6px;background:#333;color:#fff;border:0;border-radius:4px;font-size:.62rem;
+    font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;cursor:pointer;}
   footer{position:fixed;left:0;right:0;bottom:0;background:#000;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     display:flex;gap:8px;align-items:center;z-index:20;border-top:4px solid var(--rojo2);}
   footer button{background:var(--rojo);color:#fff;border:0;border-radius:4px;font-weight:900;letter-spacing:.08em;
@@ -38,7 +51,7 @@
 <body>
 <header>
   <b>Calibrar dianas</b>
-  <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Luego pulsa EXPORTAR y me pegas el texto.</p>
+  <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Si una postura no deja ninguna zona abierta (está defendiendo todo / en guardia), marca la casilla "Sin sitio de ataque" en vez de poner un aro — esas quedan como posiciones de guardia (útiles para Modo Combate). Luego pulsa EXPORTAR y me pegas el texto.</p>
 </header>
 <div id="list"></div>
 <p class="tip" id="progress"></p>
@@ -52,16 +65,20 @@
 var STAGE_H = 300;
 var GROUPS = [
   { title:'Ataques — toca el puño / el pie que golpea', items:[
-    'atk_jab','atk_cross','atk_combo','atk_elbow','kick_front','kick_mid','kick_high','knee',
+    'atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee',
     'kick_low','sweep_low' ] },
   { title:'Guardias y defensas — toca la zona abierta a atacar (Modo Ataque)', items:[
     'guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low',
-    'block_side','block_high','block_cross','block_low','cover','evade_back' ] }
+    'block_side','block_high','block_cross','block_low','cover' ] }
 ];
 var DEFAULTS = {
-  atk_jab:[0.78,0.20], atk_cross:[0.85,0.22], atk_combo:[0.30,0.18], atk_elbow:[0.30,0.22],
-  kick_front:[0.72,0.20], kick_mid:[0.72,0.34], kick_high:[0.30,0.10], knee:[0.42,0.44],
-  kick_low:[0.20,0.62], sweep_low:[0.15,0.82]
+  atk_jab:[0.821,0.168], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
+  kick_front:[0.51,0.36], kick_mid:[0.743,0.396], kick_high:[0.909,0.108], knee:[0.784,0.435],
+  kick_low:[0.222,0.661], sweep_low:[0.116,0.875],
+  guard_chest:[0.497,0.12], guard_flank:[0.503,0.115], guard_temple:[0.611,0.133],
+  guard_low:[0.5,0.13], block_side:[0.6,0.113], block_high:[0.695,0.351],
+  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.247,0.393]],
+  guard_base:null, guard_closed:null
 };
 var LSKEY = 'rds_karate_dianas_v2';
 var saved = {};
@@ -73,51 +90,114 @@ var pts = {};
 MANIFEST.forEach(function(s){ META[s.name] = s; });
 build();
 
+/* normaliza a null o array-de-puntos [[x,y],...], acepte formato viejo [x,y] o nuevo [[x,y],[x2,y2]] */
+function normPts(raw){
+  if(raw==null) return null;
+  if(typeof raw[0]==='number') return [[raw[0],raw[1]]];
+  return raw.map(function(p){ return [p[0],p[1]]; });
+}
+
 function build(){
   var list = document.getElementById('list');
   GROUPS.forEach(function(g){
     var h = document.createElement('div'); h.className='grouphdr'; h.textContent=g.title; list.appendChild(h);
     g.items.forEach(function(name){
       var meta = META[name]; if(!meta) return;
-      var p = saved[name] || DEFAULTS[name] || [0.5,0.5];
-      pts[name] = [p[0], p[1]];
+      var has = Object.prototype.hasOwnProperty.call(saved,name);
+      var raw = has ? saved[name] : (DEFAULTS[name]!==undefined ? DEFAULTS[name] : [0.5,0.5]);
+      pts[name] = normPts(raw);
+      var lastPts = pts[name] || [[0.5,0.5]]; // recuerda los ultimos puntos para restaurar si se desmarca
 
       var card = document.createElement('div'); card.className='card';
       var col = document.createElement('div');
       var nm = document.createElement('div'); nm.className='name'; nm.textContent=name;
       var ro = document.createElement('div'); ro.className='readout'; ro.id='ro_'+name;
-      col.appendChild(nm); col.appendChild(ro);
+      var chkWrap = document.createElement('label'); chkWrap.className='guardchk';
+      var chk = document.createElement('input'); chk.type='checkbox';
+      chkWrap.appendChild(chk); chkWrap.appendChild(document.createTextNode('Sin sitio de ataque (guardia)'));
+      var addBtn = document.createElement('button'); addBtn.type='button'; addBtn.className='addpt'; addBtn.textContent='+ Punto alternativo';
+      col.appendChild(nm); col.appendChild(ro); col.appendChild(chkWrap); col.appendChild(addBtn);
 
       var w = STAGE_H * (meta.w/meta.h);
       var stage = document.createElement('div'); stage.className='stage';
       stage.style.width = w+'px'; stage.style.height = STAGE_H+'px';
       var img = document.createElement('img'); img.src = 'assets/'+name+'.png';
-      var handle = document.createElement('div'); handle.className='handle';
-      stage.appendChild(img); stage.appendChild(handle);
+      var badge = document.createElement('div'); badge.className='guard-badge'; badge.textContent='Posición de guardia';
+      stage.appendChild(img); stage.appendChild(badge);
 
       card.appendChild(col); card.appendChild(stage);
       list.appendChild(card);
 
-      function place(){
-        handle.style.left = (pts[name][0]*100)+'%';
-        handle.style.top  = (pts[name][1]*100)+'%';
-        ro.textContent = 'hx '+pts[name][0].toFixed(3)+'   hy '+pts[name][1].toFixed(3);
+      var handles = [];
+      function rebuildHandles(){
+        handles.forEach(function(hd){ hd.el.remove(); });
+        handles = [];
+        var isGuard = pts[name]===null;
+        if(isGuard) return;
+        pts[name].forEach(function(pt, i){
+          var handle = document.createElement('div'); handle.className='handle'+(i>0?' pt'+i:'');
+          if(pts[name].length>1){
+            var rm = document.createElement('div'); rm.className='rm'; rm.textContent='×';
+            rm.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); });
+            rm.addEventListener('click', function(ev){
+              ev.stopPropagation();
+              pts[name].splice(i,1); lastPts=pts[name].map(function(p){return p.slice();});
+              rebuildHandles(); place(); persist();
+            });
+            handle.appendChild(rm);
+          }
+          var dragging=false;
+          function fromEvent(ev){
+            var r = stage.getBoundingClientRect();
+            var x = (ev.clientX - r.left) / r.width;
+            var y = (ev.clientY - r.top) / r.height;
+            pt[0] = Math.max(0, Math.min(1, x));
+            pt[1] = Math.max(0, Math.min(1, y));
+            lastPts = pts[name].map(function(p){return p.slice();});
+            place();
+          }
+          handle.addEventListener('pointerdown', function(ev){ dragging=true; handle.setPointerCapture(ev.pointerId); ev.preventDefault(); ev.stopPropagation(); });
+          handle.addEventListener('pointermove', function(ev){ if(dragging){ fromEvent(ev); } });
+          handle.addEventListener('pointerup', function(ev){ dragging=false; persist(); });
+          stage.appendChild(handle);
+          handles.push({el:handle, pt:pt});
+        });
       }
-      place();
 
-      var dragging=false;
-      function fromEvent(ev){
-        var r = stage.getBoundingClientRect();
-        var x = (ev.clientX - r.left) / r.width;
-        var y = (ev.clientY - r.top) / r.height;
-        pts[name][0] = Math.max(0, Math.min(1, x));
-        pts[name][1] = Math.max(0, Math.min(1, y));
-        place();
+      function place(){
+        var isGuard = pts[name]===null;
+        chk.checked = isGuard;
+        addBtn.style.display = isGuard ? 'none' : 'inline-block';
+        stage.classList.toggle('is-guard', isGuard);
+        if(isGuard){ ro.textContent = 'sin sitio de ataque'; return; }
+        handles.forEach(function(hd){
+          hd.el.style.left = (hd.pt[0]*100)+'%';
+          hd.el.style.top  = (hd.pt[1]*100)+'%';
+        });
+        ro.textContent = pts[name].map(function(p,i){ return 'p'+(i+1)+': hx '+p[0].toFixed(3)+' hy '+p[1].toFixed(3); }).join('   ');
       }
-      handle.addEventListener('pointerdown', function(ev){ dragging=true; handle.setPointerCapture(ev.pointerId); ev.preventDefault(); });
-      handle.addEventListener('pointermove', function(ev){ if(dragging){ fromEvent(ev); } });
-      handle.addEventListener('pointerup', function(ev){ dragging=false; persist(); });
-      stage.addEventListener('pointerdown', function(ev){ if(ev.target===stage||ev.target===img){ fromEvent(ev); persist(); } });
+      rebuildHandles(); place();
+
+      chk.addEventListener('change', function(){
+        pts[name] = chk.checked ? null : lastPts.map(function(p){return p.slice();});
+        rebuildHandles(); place(); persist();
+      });
+      addBtn.addEventListener('click', function(){
+        if(pts[name]===null) return;
+        var last = pts[name][pts[name].length-1];
+        pts[name].push([ +(1-last[0]).toFixed(3), last[1] ]); // por defecto, espejado horizontal del ultimo punto
+        lastPts = pts[name].map(function(p){return p.slice();});
+        rebuildHandles(); place(); persist();
+      });
+      stage.addEventListener('pointerdown', function(ev){
+        if(pts[name]===null || ev.target!==stage && ev.target!==img) return;
+        var r = stage.getBoundingClientRect();
+        var x = Math.max(0, Math.min(1, (ev.clientX-r.left)/r.width));
+        var y = Math.max(0, Math.min(1, (ev.clientY-r.top)/r.height));
+        pts[name][0][0]=x; pts[name][0][1]=y; // toque directo en el stage mueve el primer punto
+        lastPts = pts[name].map(function(p){return p.slice();});
+        place(); persist();
+      });
     });
   });
   updProgress();
@@ -128,17 +208,23 @@ function persist(){
   updProgress();
 }
 function updProgress(){
-  var moved = 0, total = 0;
+  var moved = 0, total = 0, guard = 0, multi = 0;
   Object.keys(pts).forEach(function(k){
     total++;
-    var d = DEFAULTS[k] || [0.5,0.5];
-    if(Math.abs(pts[k][0]-d[0])>0.001 || Math.abs(pts[k][1]-d[1])>0.001 || saved[k]) moved++;
+    if(pts[k]===null){ guard++; if(Object.prototype.hasOwnProperty.call(saved,k)) moved++; return; }
+    if(pts[k].length>1) multi++;
+    var d = JSON.stringify(normPts(DEFAULTS[k]!==undefined ? DEFAULTS[k] : [0.5,0.5]));
+    if(d!==JSON.stringify(pts[k]) || Object.prototype.hasOwnProperty.call(saved,k)) moved++;
   });
-  document.getElementById('progress').textContent = 'Ajustadas: '+moved+' / '+total+' (se guardan solas al soltar)';
+  document.getElementById('progress').textContent = 'Ajustadas: '+moved+' / '+total+' · '+guard+' sin sitio de ataque · '+multi+' con puntos alternativos (se guardan solas)';
 }
 function exportAll(){
   var o = {};
-  Object.keys(pts).forEach(function(k){ o[k] = [ +pts[k][0].toFixed(3), +pts[k][1].toFixed(3) ]; });
+  Object.keys(pts).forEach(function(k){
+    if(pts[k]===null){ o[k]=null; return; }
+    var rounded = pts[k].map(function(p){ return [ +p[0].toFixed(3), +p[1].toFixed(3) ]; });
+    o[k] = rounded.length===1 ? rounded[0] : rounded;
+  });
   document.getElementById('out').value = JSON.stringify(o);
 }
 function copyOut(){

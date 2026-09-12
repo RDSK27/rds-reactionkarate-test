@@ -826,8 +826,10 @@ document.addEventListener('click', function(e){ if(e.target.closest && e.target.
      Tarde o fuera del punto = punto en contra (penaliza la media).
    Ataque: el rival cambia de guardia dejando una zona descubierta.
      Tocar esa zona antes de que recomponga la guardia = acierto.
-     Algunas guardias son señuelo (sin apertura real, diana bajo los pies):
-     si el jugador "ataca" ahí, se come el contragolpe.
+     Algunas posturas son "posiciones de guardia" (sin sitio de ataque,
+     A_HITS[pose]===null): no se pinta aro y lo correcto es NO tocar;
+     si el jugador "ataca" igualmente, se come el contragolpe. Estas
+     posiciones de guardia son compartidas con el futuro Modo Combate.
    =================================================================== */
 var K_DIR = "assets/";
 var K_SPR = {
@@ -845,32 +847,36 @@ var K_SPR = {
 };
 Object.keys(K_SPR).forEach(function(k){ var im=new Image(); im.src=K_DIR+k+".png"; });
 
-/* ---- Modo Ataque: guardias/bloqueos con zona abierta + señuelos ---- */
+/* ---- Modo Ataque: guardias/bloqueos con zona abierta + posiciones de guardia ---- */
+/* A_HITS: [hx,hy] = zona abierta a atacar. [[hx,hy],[hx2,hy2],...] = varios
+   puntos válidos (se elige uno al azar cada vez que sale esa postura, p.ej.
+   "cover" se puede atacar por un costado u otro). null = posición de guardia
+   (sin sitio de ataque, defendiendo todo) — no se pinta aro y lo correcto es
+   NO tocar. Mismo formato que exporta calibrar.html: se puede pegar tal cual. */
 var A_HITS = {
-  guard_chest:[0.50,0.46], guard_flank:[0.66,0.52], guard_temple:[0.62,0.11],
-  guard_low:[0.50,0.13], block_side:[0.70,0.48], block_high:[0.55,0.46],
-  block_cross:[0.38,0.76], block_low:[0.70,0.40], cover:[0.50,0.50],
-  guard_base:[0.50,0.93], guard_closed:[0.50,0.93], evade_back:[0.50,0.90]
+  guard_chest:[0.497,0.12], guard_flank:[0.503,0.115], guard_temple:[0.611,0.133],
+  guard_low:[0.5,0.13], block_side:[0.6,0.113], block_high:[0.695,0.351],
+  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.247,0.393]],
+  guard_base:null, guard_closed:null
 };
 var A_NAMES = {
-  guard_chest:'Torso abierto', guard_flank:'Costado abierto', guard_temple:'Sien abierta',
-  guard_low:'Cabeza abierta', block_side:'Costado abierto', block_high:'Torso abierto',
-  block_cross:'Piernas abiertas', block_low:'Torso abierto', cover:'Torso abierto',
-  guard_base:'Guardia cerrada', guard_closed:'Guardia cerrada', evade_back:'Se repliega'
+  guard_chest:'Cabeza abierta', guard_flank:'Cabeza abierta', guard_temple:'Sien abierta',
+  guard_low:'Cabeza abierta', block_side:'Sien abierta', block_high:'Costado abierto',
+  block_cross:'Cabeza abierta', block_low:'Sien abierta', cover:'Costado abierto',
+  guard_base:'Guardia cerrada', guard_closed:'Guardia cerrada'
 };
-var A_POOL_OPEN  = ['guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover'];
-var A_POOL_DECOY = ['guard_base','guard_closed','evade_back'];
-var A_POOL = A_POOL_OPEN.concat(A_POOL_DECOY);
-var A_DECOY_MS = 250; // "tiempo" que cuenta en la media cuando el jugador acierta NO atacando un señuelo
-var A_TECHS = A_POOL.map(function(k){
-  var decoy = A_POOL_DECOY.indexOf(k)>=0;
-  return { s:k, hx:A_HITS[k][0], hy:A_HITS[k][1], name:A_NAMES[k], decoy:decoy };
-});
+var A_POOL = Object.keys(A_HITS);
+var A_GUARD_MS = 250; // "tiempo" que cuenta en la media cuando el jugador acierta NO atacando una posición de guardia
+function aPickHit(spec){
+  if(spec==null) return null;
+  return Array.isArray(spec[0]) ? spec[Math.floor(Math.random()*spec.length)] : spec;
+}
+var A_TECHS = A_POOL.map(function(k){ return { s:k, hitSpec:A_HITS[k], name:A_NAMES[k] }; });
 
 var K_HITS = {
-  atk_jab:[0.784,0.174], atk_cross:[0.902,0.231], atk_combo:[0.524,0.217],
-  kick_front:[0.486,0.361], kick_mid:[0.749,0.387], kick_high:[0.866,0.119], knee:[0.776,0.424],
-  kick_low:[0.226,0.676], sweep_low:[0.097,0.912]
+  atk_jab:[0.821,0.168], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
+  kick_front:[0.51,0.36], kick_mid:[0.743,0.396], kick_high:[0.909,0.108], knee:[0.784,0.435],
+  kick_low:[0.222,0.661], sweep_low:[0.116,0.875]
 };
 var K_NAMES = {
   atk_jab:'Puño adelantado', atk_cross:'Puño reverso', atk_combo:'Combinación',
@@ -902,7 +908,7 @@ function kLayout(name, tech, mirror){
   var bodyF=mirror?(1-sp.cx):sp.cx;
   var left=SW/2 - dispW*bodyF;
   var ringX=null, ringY=null;
-  if(tech){
+  if(tech && tech.hx!=null){
     var hxF=mirror?(1-tech.hx):tech.hx;
     ringX=left+dispW*hxF; ringY=top+dispH*tech.hy;
     var m=32;
@@ -913,7 +919,7 @@ function kLayout(name, tech, mirror){
   kKata.style.width=dispW+'px'; kKata.style.height=dispH+'px';
   kKata.style.left=left+'px'; kKata.style.top=top+'px';
   kKata.style.transform=mirror?'scaleX(-1)':'none';
-  if(tech){ kRing.style.left=ringX+'px'; kRing.style.top=ringY+'px'; }
+  if(ringX!=null){ kRing.style.left=ringX+'px'; kRing.style.top=ringY+'px'; }
 }
 
 function kAbort(){ clearTimeout(K.timer); K.state='idle'; }
@@ -951,11 +957,18 @@ function kNext(){
 }
 function kMode(){ return S.s1==='atk' ? 'atk' : 'def'; }
 function kFire(){
-  var pool = kMode()==='atk' ? A_TECHS : K_TECHS;
-  K.tech = pool[Math.floor(Math.random()*pool.length)];
+  var atk = kMode()==='atk';
+  var pool = atk ? A_TECHS : K_TECHS;
+  var picked = pool[Math.floor(Math.random()*pool.length)];
+  if(atk){
+    var hp = aPickHit(picked.hitSpec);
+    K.tech = { s:picked.s, name:picked.name, hx:hp?hp[0]:null, hy:hp?hp[1]:null, guard:!hp };
+  } else {
+    K.tech = picked;
+  }
   K.mirror = Math.random()<0.5;
   kLayout(K.tech.s, K.tech, K.mirror);
-  kRing.className='k-ring on';
+  kRing.className = K.tech.guard ? 'k-ring' : 'k-ring on';
   kSetStatus(kMode()==='atk' ? '¡Ataca!' : '¡Defiende!', 'go');
   K.t0=performance.now();
   K.state='go';
@@ -966,11 +979,12 @@ function kResolve(tap){
   clearTimeout(K.timer);
   K.state='done';
   var atk = kMode()==='atk';
+  var isGuard = atk && K.tech.guard;
   var ok, ms, why;
-  if(atk && K.tech.decoy){
-    ok = !tap; // en un señuelo, lo correcto es NO tocar
-    ms = ok ? A_DECOY_MS : K_PENALTY;
-    why = ok ? 'Guardia cerrada · no mordiste' : 'Te contragolpearon';
+  if(isGuard){
+    ok = !tap; // posición de guardia: sin sitio de ataque, lo correcto es NO tocar
+    ms = ok ? A_GUARD_MS : K_PENALTY;
+    why = ok ? 'Guardia cerrada · no atacaste' : 'Te contragolpearon';
   } else {
     ok = tap && tap.onTarget && tap.dt<=K_WINDOW;
     ms = ok ? Math.round(tap.dt) : K_PENALTY;
@@ -980,12 +994,12 @@ function kResolve(tap){
   if(ok){
     K.def++; S.kDef=K.def;
     S.times.push(ms);
-    kRing.className='k-ring ok';
+    kRing.className = isGuard ? 'k-ring' : 'k-ring ok';
     kSetStatus((atk?'¡Acierto!':'Defendido')+' · '+why,'ok');
   } else {
     K.pt++;
     S.times.push(ms);
-    kRing.className='k-ring no';
+    kRing.className = isGuard ? 'k-ring' : 'k-ring no';
     kSetStatus((atk?'Fallo':'Punto en contra')+' · '+why,'no');
   }
   $('kHudDef').textContent=(atk?'Acx ':'Def ')+K.def;
