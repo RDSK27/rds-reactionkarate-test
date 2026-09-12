@@ -354,7 +354,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v3</div>
+    <div class="app-ver">v4</div>
     </div>
 
   </main>
@@ -931,26 +931,43 @@ function kLayout(name, tech, mirror){
   if(ringX!=null){ kRing.style.left=ringX+'px'; kRing.style.top=ringY+'px'; }
 }
 
-/* Amago de desplazamiento: parte de guardia base y se desliza durante la
-   ventana de reacción. No hay diana — si el jugador toca, falla (cree que
-   viene algo y no era nada); si no toca, acierto. Usa CSS transition en vez
-   de recalcular kLayout en cada frame. */
+/* Amago de desplazamiento: parte de una guardia y, al desplazarse, cambia a
+   otra guardia distinta durante la ventana de reacción. No hay diana — si
+   el jugador toca, falla (cree que viene algo y no era nada); si no toca,
+   acierto. Usa CSS transition en vez de recalcular kLayout en cada frame. */
 var MOVE_DIRS = ['fwd','back','left','right'];
 var MOVE_NAMES = { fwd:'Avanza', back:'Retrocede', left:'Se desplaza (izq.)', right:'Se desplaza (der.)' };
+var GUARD_POSE_POOL = ['guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low'];
 function kAnimateMove(dir, ms){
-  kLayout('guard_base', null, K.mirror);
-  var left=parseFloat(kKata.style.left), top=parseFloat(kKata.style.top);
-  var w=parseFloat(kKata.style.width), h=parseFloat(kKata.style.height);
-  var SW=kStage.clientWidth;
-  var nLeft=left, nW=w, nH=h, nTop=top;
-  if(dir==='left'){ nLeft = left - SW*0.16; }
-  else if(dir==='right'){ nLeft = left + SW*0.16; }
-  else if(dir==='fwd'){ nW=w*1.15; nH=h*1.15; nLeft=left-(nW-w)/2; nTop=(top+h)-nH; }
-  else if(dir==='back'){ nW=w*0.86; nH=h*0.86; nLeft=left-(nW-w)/2; nTop=(top+h)-nH; }
-  kKata.getBoundingClientRect(); // fuerza reflow para que la transition arranque desde el estado actual
-  kKata.style.transition = 'left '+ms+'ms linear, top '+ms+'ms linear, width '+ms+'ms linear, height '+ms+'ms linear';
-  kKata.style.left=nLeft+'px'; kKata.style.top=nTop+'px';
-  kKata.style.width=nW+'px'; kKata.style.height=nH+'px';
+  var fromPose = GUARD_POSE_POOL[Math.floor(Math.random()*GUARD_POSE_POOL.length)];
+  var toPose;
+  do{ toPose = GUARD_POSE_POOL[Math.floor(Math.random()*GUARD_POSE_POOL.length)]; }while(toPose===fromPose);
+  kLayout(fromPose, null, K.mirror);
+  var sp=K_SPR[toPose], SW=kStage.clientWidth, SH=kStage.clientHeight;
+  var scale=Math.min(SH*0.85/sp.h, SW*0.96/sp.w);
+  var dispW=sp.w*scale, dispH=sp.h*scale;
+  var floorY=SH*0.90, top=floorY-dispH;
+  var bodyF=K.mirror?(1-sp.cx):sp.cx;
+  var left=SW/2 - dispW*bodyF;
+  var nLeft=left, nW=dispW, nH=dispH, nTop=top;
+  if(dir==='left'){ nLeft = left - SW*0.30; }
+  else if(dir==='right'){ nLeft = left + SW*0.30; }
+  else if(dir==='fwd'){ nW=dispW*1.28; nH=dispH*1.28; nLeft=left-(nW-dispW)/2; nTop=(top+dispH)-nH; }
+  else if(dir==='back'){ nW=dispW*0.78; nH=dispH*0.78; nLeft=left-(nW-dispW)/2; nTop=(top+dispH)-nH; }
+  kKata.style.transition='none';
+  kKata.src = K_DIR+toPose+'.png'; // cambia de guardia justo al iniciar el desplazamiento
+  kKata.getBoundingClientRect(); // fuerza reflow: fija el cambio de sprite ANTES de animar la posición
+  /* doble rAF: si se aplica la transition y el nuevo left/top en el mismo
+     tick que el cambio de src, algunos navegadores saltan directo al
+     estado final sin animar. Con dos frames de por medio, el "sin
+     transition" y el "con transition" quedan confirmados por separado. */
+  requestAnimationFrame(function(){
+    kKata.style.transition = 'left '+ms+'ms linear, top '+ms+'ms linear, width '+ms+'ms linear, height '+ms+'ms linear';
+    requestAnimationFrame(function(){
+      kKata.style.left=nLeft+'px'; kKata.style.top=nTop+'px';
+      kKata.style.width=nW+'px'; kKata.style.height=nH+'px';
+    });
+  });
 }
 
 function kAbort(){ clearTimeout(K.timer); K.state='idle'; }
