@@ -277,8 +277,6 @@ if('serviceWorker' in navigator){
   .c-score-aka{ background:#c6302a; } .c-score-ao{ background:#1565d8; }
   .c-timer{ font-family:Arial,Helvetica,sans-serif; font-size:1.3rem; font-weight:900; color:#fff; letter-spacing:.04em; }
   .c-timer.low{ color:#ef6a58; }
-  .c-belt{ position:absolute; border-radius:2px; opacity:.92; pointer-events:none; z-index:3; }
-  .c-belt.aka{ background:#c6302a; } .c-belt.ao{ background:#1565d8; }
   .k-status.hajime{ background:rgba(17,17,17,.96); font-size:1.4rem; letter-spacing:.24em; padding:10px 0; }
   .k-status.point{ background:rgba(162,58,41,.96); font-size:1.05rem; }
   .k-status.pointao{ background:rgba(21,101,216,.94); font-size:1.05rem; }
@@ -375,7 +373,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v8</div>
+    <div class="app-ver">v9</div>
     </div>
 
   </main>
@@ -401,7 +399,6 @@ if('serviceWorker' in navigator){
     <div class="k-stage-wrap">
       <div class="k-stage" id="kStage">
         <img class="k-kata" id="kKata" alt="">
-        <div class="c-belt" id="cBelt" style="display:none"></div>
         <div class="k-ring" id="kRing"></div>
         <div class="k-mark" id="kMark"></div>
         <div class="k-status" id="kStatus">Prepárate</div>
@@ -1020,7 +1017,6 @@ function kStart(){
   $('cHud').style.display = cmb ? 'flex' : 'none';
   $('cControls').style.display = cmb ? 'flex' : 'none';
   if(cmb){ cStart(); return; }
-  $('cBelt').style.display='none';
   K.total = parseInt(selVal('seg2'),10)||25;
   K.pace  = selVal('seg3')||'cont';
   K.rep=0; K.def=0; K.pt=0; K.state='idle';
@@ -1131,8 +1127,7 @@ function cStart(){
   cUpdateScore(); cUpdateTimer();
   $('cAmagoBtn').disabled=true; $('cZones').style.display='none';
   kRing.className='k-ring'; kMark.className='k-mark';
-  kLayout('guard_base', null, false);
-  cUpdateBelt();
+  cShowPose('guard_base', null, false);
   kSetStatus('¡Hajime!','hajime');
   C.timer=setTimeout(function(){
     C.paused=false; cResumeTimer(); cParado();
@@ -1152,17 +1147,15 @@ function cResumeTimer(){
 function cPauseTimer(){ C.paused=true; }
 function cActorColor(side){ return side===C.akaSide ? 'aka' : 'ao'; }
 
-/* Cinturon Aka/Ao superpuesto sobre la guardia actual (rectangulo fijo
-   aproximado a la altura del cinturon en las posturas de pie). */
-function cUpdateBelt(){
-  var belt=$('cBelt');
-  if(kMode()!=='cmb'){ belt.style.display='none'; return; }
-  var w=parseFloat(kKata.style.width), h=parseFloat(kKata.style.height);
-  var left=parseFloat(kKata.style.left), top=parseFloat(kKata.style.top);
-  belt.className='c-belt '+(C.akaSide==='rival'?'aka':'ao');
-  belt.style.left=(left+w*0.30)+'px'; belt.style.top=(top+h*0.535)+'px';
-  belt.style.width=(w*0.40)+'px'; belt.style.height=(h*0.045)+'px';
-  belt.style.display='block';
+/* Posturas de guardia con variante de cinturon recoloreado de verdad
+   (assets/<pose>_red.png / _blue.png, mismas dimensiones que el original
+   -- kLayout calcula la posicion con el nombre normal y aqui solo se
+   cambia el archivo pintado). */
+var C_BELT_POSES = ['guard_base','guard_closed','guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover'];
+function cBeltColor(){ return C.akaSide==='rival' ? 'red' : 'blue'; }
+function cShowPose(name, tech, mirror){
+  kLayout(name, tech, mirror);
+  if(C_BELT_POSES.indexOf(name)>=0){ kKata.src = K_DIR+name+'_'+cBeltColor()+'.png'; }
 }
 /* pinta un aro en (hx,hy) del sprite ya mostrado (sin recalcular kLayout) */
 function cRingAt(hx, hy, mirror){
@@ -1176,8 +1169,7 @@ function cParado(){
   if(!C.active) return;
   C.state='parado';
   kRing.className='k-ring'; kMark.className='k-mark';
-  kLayout('guard_base', null, false);
-  cUpdateBelt();
+  cShowPose('guard_base', null, false);
   kSetStatus('Combate');
   $('cAmagoBtn').disabled=false;
   var lo=1500, hi=4000;
@@ -1198,7 +1190,6 @@ function cBeginAttack(){
   C.pending = K.tech;
   C.mirror = Math.random()<0.5;
   kLayout(K.tech.s, K.tech, C.mirror);
-  cUpdateBelt();
   kRing.className='k-ring on';
   kSetStatus('¡Ataca!','go');
   C.t0=performance.now();
@@ -1249,8 +1240,7 @@ function cPickZone(zone){
   var hit = A_HITS[pose];
   C.state='pico_window';
   C.pending = { pose:pose, hit:hit };
-  kLayout(pose, null, false);
-  cUpdateBelt();
+  cShowPose(pose, null, false);
   if(hit){
     var hp = Array.isArray(hit[0]) ? hit[Math.floor(Math.random()*hit.length)] : hit;
     cRingAt(hp[0], hp[1], false);
