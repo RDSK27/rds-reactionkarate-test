@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v33</div>
+    <div class="app-ver">v34</div>
     </div>
 
   </main>
@@ -433,7 +433,13 @@ if('serviceWorker' in navigator){
 
     <div class="segment" id="segStrategy" style="display:none">
       <button class="sel" data-v="libre">Libre</button>
-      <button data-v="plan">Plan</button>
+      <button data-v="tactica">Táctica</button>
+    </div>
+
+    <div class="segment" id="segPlan" style="display:none">
+      <button class="sel" data-v="a">Plan A</button>
+      <button data-v="b">Plan B</button>
+      <button data-v="c">Plan C</button>
     </div>
   </main>
   <div class="results-actions">
@@ -707,7 +713,7 @@ function setSeg(id,val){
 var S={ s1:'a', s2:'a', s3:'a', name:'RDS', sport:'', t0:0, times:[],
         resAvg:NaN, resTotal:0, resEnsayos:0, saved:null,
         lastRec:null, lastRecKey:null, rankKey:null,
-        color:'aka', gender:'m', cTime:60, cStrategy:'libre' };
+        color:'aka', gender:'m', cTime:60, cStrategy:'libre', cPlan:'a' };
 
 function filterInitials(el){ el.value=el.value.replace(/[^A-Za-z]/g,'').toUpperCase(); }
 
@@ -733,6 +739,8 @@ function openMatchSetup(){
   setSeg('segGender', S.gender);
   setSeg('segTime', String(S.cTime));
   setSeg('segStrategy', S.cStrategy);
+  setSeg('segPlan', S.cPlan);
+  $('segPlan').style.display = (cmb && S.cStrategy==='tactica') ? 'flex' : 'none';
   show('matchsetup');
 }
 function confirmMatchSetup(){
@@ -741,6 +749,7 @@ function confirmMatchSetup(){
   if(S.s1==='cmb'){
     S.cTime = parseInt(selVal('segTime'),10)||60;
     S.cStrategy = selVal('segStrategy')||'libre';
+    S.cPlan = selVal('segPlan')||'a';
   }
   preloadSprites();
   applyCharHits();
@@ -988,7 +997,11 @@ $('seg1').addEventListener('click', function(e){
 
 /* ---------- Wiring ---------- */
 seg('seg1'); seg('seg2'); seg('seg3');
-seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
+seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy'); seg('segPlan');
+$('segStrategy').addEventListener('click', function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  $('segPlan').style.display = (b.getAttribute('data-v')==='tactica') ? 'flex' : 'none';
+});
 segRank('seg1R'); segRank('seg2R'); segRank('seg3R');
 $('btnRank2').addEventListener('click', showRanking);
 $('btnGuardar').addEventListener('click', function(){
@@ -1163,26 +1176,67 @@ var C_DEFENDS = {
    tocar para provocar cada postura de defensa -- calibrado en calibrar.html
    (sección "Amago"), POR PERSONAJE igual que A_HITS/K_HITS/C_COUNTERS. */
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
-/* Márgenes de Combate (pedido 2026-09-13): defender el ataque real del
-   rival por debajo de 500ms (antes 650 = kWindow()+C_EXTRA_MS); pico y
-   parar-contraatacar se quedan en su base de siempre pero ahora son
-   ADAPTATIVOS -- si el jugador gana por más de 2 puntos, se complican
-   10ms por cada punto de ventaja adicional (ver cWinPico()/cWinParar()). */
-var C_WIN_DEFEND = 480;  // ms para parar/defender el ataque real del rival en Combate
-var C_WIN_PICO_BASE = 400;  // ms base para entrar al hueco tras un pique
+/* Márgenes de Combate (2026-09-13; corregido el mismo día -- el usuario
+   había dicho 480/400 y luego rectificó a 500/300). Contraataque siempre
+   usa la penalización adaptativa por MARCADOR (cAdaptivePenalty). Defender
+   y amago tienen además su propio ajuste por RACHA cuando hay un Plan de
+   Táctica activo (ver PLAN_CONFIG/cWinDefend()/cWinPico() más abajo) --
+   sin Táctica (Libre), defender es fijo y amago usa la misma penalización
+   por marcador que contraataque. */
+var C_WIN_DEFEND = 500;     // ms para parar/defender el ataque real del rival (Libre / sin ajuste de plan)
+var C_WIN_PICO_BASE = 300;  // ms base para entrar al hueco tras un pique (Libre)
 var C_WIN_PARAR_BASE = 350; // ms base para contraatacar tras parar una técnica del rival
-/* Penalización adaptativa: 10ms por cada punto de ventaja del jugador por
-   encima de 2 (ventaja 3 -> -10ms, ventaja 4 -> -20ms, etc.). Se acota sola
-   por la regla de corte a 8 puntos de diferencia (cEndMatch), no hace falta
-   un suelo aparte. */
+var C_WIN_FEINT_DEFEND = 550; // ms para defender la técnica DEFINITIVA de un "amago rival" -- fijo, igual en los 3 planes
 function cAdaptivePenalty(){
   var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
   var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
   var lead = playerScore - rivalScore;
   return lead>2 ? (lead-2)*10 : 0;
 }
-function cWinPico(){ return C_WIN_PICO_BASE - cAdaptivePenalty(); }
 function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
+
+/* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
+   Libre = comportamiento de siempre (ataques espontáneos al azar, sin
+   cambios de guardia ni amagos del rival, defender/amago con los valores
+   de arriba). Con un Plan activo, el rival programa sus acciones según
+   3 tasas por minuto (técnica real / cambio de guardia sin más / "amago
+   rival" — ver cScheduleNext()), y algunos planes hacen que el umbral de
+   defender o de amago vaya subiendo/bajando de 10 en 10 según el jugador
+   vaya acertando o fallando (racha), en vez de quedarse fijo.
+   NOTA: en el resumen del usuario, "cambios de guardia" del Plan C llegó
+   escrito como 2/min igual que el Plan A ("pocos") pese a que el propio
+   Plan C se describe como el que más juega con el cambio de guardia y se
+   etiquetó "Medio" (entre los 2 de A y los 4 de B) -- se interpretó como
+   una errata y se usó 3/min (el valor medio real entre 2 y 4). Avisado en
+   el resumen final para que lo confirme o corrija. */
+var PLAN_CONFIG = {
+  a: { label:'Plan A · Ataque',      atkPerMin:7, guardPerMin:2, feintPerMin:3, defendStart:525, defendStep:10 },
+  b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:4, feintPerMin:2, defendStart:475, defendStep:10, amagoStart:300, amagoStep:10 },
+  c: { label:'Plan C · Provocación', atkPerMin:5, guardPerMin:3, feintPerMin:5 }
+};
+function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
+function cWinDefend(){
+  var cfg=cPlanCfg();
+  return (cfg && cfg.defendStart!=null) ? C.planDefend : C_WIN_DEFEND;
+}
+function cAdjustPlanDefend(success){
+  var cfg=cPlanCfg(); if(!cfg || cfg.defendStart==null) return;
+  C.planDefend += success ? -cfg.defendStep : cfg.defendStep;
+  C.planDefend = Math.min(cfg.defendStart, Math.max(150, C.planDefend)); // techo = inicio del plan; suelo de seguridad 150
+}
+function cWinPico(){
+  var cfg=cPlanCfg();
+  if(cfg && cfg.amagoStart!=null) return C.planAmago;
+  return C_WIN_PICO_BASE - cAdaptivePenalty();
+}
+function cAdjustPlanAmago(success){
+  var cfg=cPlanCfg(); if(!cfg || cfg.amagoStart==null) return;
+  C.planAmago += success ? -cfg.amagoStep : cfg.amagoStep;
+  C.planAmago = Math.min(cfg.amagoStart, Math.max(100, C.planAmago));
+}
+/* Posturas de guardia/bloqueo que el rival puede enseñar como "cambio de
+   guardia" puramente decorativo (Plan): sin aro, sin nada que tocar. */
+var C_GUARD_POSES = ['guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover','guard_closed'];
 
 var K_NAMES = {
   atk_jab:'Puño adelantado', atk_cross:'Puño reverso', atk_combo:'Combinación',
@@ -1465,7 +1519,7 @@ function kFinish(){
    =================================================================== */
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
-          amagoUsed:0, amagoTotal:0 };
+          amagoUsed:0, amagoTotal:0, plan:null, planDefend:null, planAmago:null, guardUpTimer:0 };
 var C_TERM = { yuko:'Yuko', 'waza-ari':'Waza-ari', ippon:'Ippon' };
 /* Valor (yuko/waza-ari/ippon) de un acierto de amago (por postura) o de
    contraataque tras parar (por técnica) -- calibrado en calibrar.html. */
@@ -1478,7 +1532,7 @@ var C_COUNTER_VALUES = {
   kick_mid:'yuko', kick_high:'ippon', knee:'yuko', kick_low:'yuko', sweep_low:'ippon'
 };
 
-function cAbort(){ clearTimeout(C.timer); clearInterval(C.timerId); C.active=false; C.state='idle'; }
+function cAbort(){ clearTimeout(C.timer); clearTimeout(C.guardUpTimer); clearInterval(C.timerId); C.active=false; C.state='idle'; }
 
 function cStart(){
   clearTimeout(C.timer); clearInterval(C.timerId);
@@ -1487,6 +1541,10 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
+  C.plan = (S.cStrategy==='tactica') ? (S.cPlan||'a') : null;
+  var planCfg = C.plan && PLAN_CONFIG[C.plan];
+  C.planDefend = (planCfg && planCfg.defendStart!=null) ? planCfg.defendStart : null;
+  C.planAmago  = (planCfg && planCfg.amagoStart!=null)  ? planCfg.amagoStart  : null;
   K.pace='paus';
   cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
   $('cAmagoBtn').disabled=true;
@@ -1564,15 +1622,80 @@ function cParado(){
   cShowPose('guard_base', null, C.mirror);
   kSetStatus('');
   $('cAmagoBtn').disabled = (C.amagoUsed>=C.amagoTotal);
-  var lo=1500, hi=4000;
-  C.timer=setTimeout(cRivalSpontaneous, lo+Math.random()*(hi-lo));
+  cScheduleNext();
 }
 function cRivalSpontaneous(){
   if(!C.active || C.state!=='parado') return;
   cBeginAttack();
 }
+/* Programa la siguiente acción del rival. Sin Táctica (Libre): igual que
+   siempre, un ataque espontáneo tras 1.5-4s. Con un Plan activo: se sortea
+   TIPO de acción (técnica real / cambio de guardia / "amago rival") según
+   las 3 tasas por minuto del plan, y el tiempo hasta esa acción sale de la
+   tasa total (para que el ritmo medio de verdad se acerque a esas tasas). */
+function cScheduleNext(){
+  if(!C.active) return;
+  var cfg = cPlanCfg();
+  if(!cfg){
+    var lo=1500, hi=4000;
+    C.timer=setTimeout(cRivalSpontaneous, lo+Math.random()*(hi-lo));
+    return;
+  }
+  var total = cfg.atkPerMin+cfg.guardPerMin+cfg.feintPerMin;
+  var avgMs = 60000/total;
+  var delay = avgMs*0.5 + Math.random()*avgMs; // entre 0.5x y 1.5x de la media, para no ser un metrónomo
+  C.timer=setTimeout(function(){
+    if(!C.active || C.state!=='parado') return;
+    var r = Math.random()*total;
+    if(r < cfg.atkPerMin){ cBeginAttack(); }
+    else if(r < cfg.atkPerMin+cfg.guardPerMin){ cGuardChangeOnly(); }
+    else { cBeginFeintAttack(); }
+  }, delay);
+}
+/* Cambio de guardia puramente decorativo (solo con Plan activo): el rival
+   enseña otra postura de guardia/bloqueo sin ningún hueco real, y vuelve a
+   la guardia neutra -- no hay nada que tocar, solo busca despistar. */
+function cGuardChangeOnly(){
+  if(!C.active || C.state!=='parado') return;
+  C.mirror = Math.random()<0.5;
+  var pose = C_GUARD_POSES[Math.floor(Math.random()*C_GUARD_POSES.length)];
+  cShowPose(pose, null, C.mirror);
+  kRing.className='k-ring';
+  C.timer=setTimeout(function(){
+    if(!C.active || C.state!=='parado') return;
+    cShowPose('guard_base', null, C.mirror);
+    cScheduleNext();
+  }, 500);
+}
+/* "Amago rival" (solo con Plan activo): el rival saca una técnica falsa
+   ~100ms (no se puede/debe reaccionar a esa) y a continuación la técnica
+   YA definitiva, que se defiende con el umbral fijo C_WIN_FEINT_DEFEND
+   (550ms) en vez del umbral de defensa normal/adaptativo del plan. */
+function cBeginFeintAttack(){
+  if(!C.active || C.state!=='parado') return;
+  clearTimeout(C.timer);
+  $('cAmagoBtn').disabled=true;
+  C.state='rival_feint';
+  var fakeName = K_POOL[Math.floor(Math.random()*K_POOL.length)];
+  var realPool = K_POOL.filter(function(n){ return n!==fakeName; });
+  var realName = realPool[Math.floor(Math.random()*realPool.length)];
+  C.mirror = Math.random()<0.5;
+  cShowPose(fakeName, null, C.mirror);
+  kRing.className='k-ring'; // el amago no se toca, no hay aro
+  C.timer=setTimeout(function(){
+    if(C.state!=='rival_feint') return;
+    C.state='rival_attack';
+    K.tech = { s:realName, hx:K_HITS[realName][0], hy:K_HITS[realName][1], name:K_NAMES[realName], sc:(K_SC[realName]||1), winBonus:0, isFeintReal:true };
+    C.pending = K.tech;
+    cShowPose(K.tech.s, K.tech, C.mirror);
+    kRing.className='k-ring on';
+    C.t0=performance.now();
+    C.timer=setTimeout(function(){ cResolveAttack(null); }, C_WIN_FEINT_DEFEND+K_GRACE);
+  }, 100);
+}
 
-/* ---- Ataque real del rival (espontaneo o tras un pique fallido) ---- */
+/* ---- Ataque real del rival (espontaneo, tras un pique fallido, o tras
+   cScheduleNext en un Plan) ---- */
 function cBeginAttack(){
   clearTimeout(C.timer);
   C.state='rival_attack';
@@ -1584,14 +1707,16 @@ function cBeginAttack(){
   cShowPose(K.tech.s, K.tech, C.mirror);
   kRing.className='k-ring on';
   C.t0=performance.now();
-  var win = C_WIN_DEFEND+K_GRACE;
+  var win = cWinDefend()+K_GRACE;
   C.timer=setTimeout(function(){ cResolveAttack(null); }, win);
 }
 function cResolveAttack(tap){
   if(C.state!=='rival_attack') return;
   clearTimeout(C.timer);
   var tech=C.pending;
-  var ok = tap && tap.onTarget && tap.dt<=C_WIN_DEFEND;
+  var threshold = tech.isFeintReal ? C_WIN_FEINT_DEFEND : cWinDefend();
+  var ok = tap && tap.onTarget && tap.dt<=threshold;
+  if(!tech.isFeintReal){ cAdjustPlanDefend(ok); } // el amago-rival no cuenta para la racha del plan
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
   var ctr = C_COUNTERS[tech.s];
@@ -1652,10 +1777,20 @@ function cPickPose(pose){
   C.state='pico_window';
   C.pending = { pose:pose, hit:hit };
   cShowPose(pose, null, mirror);
+  clearTimeout(C.guardUpTimer);
   if(hit){
     var hp = Array.isArray(hit[0]) ? hit[Math.floor(Math.random()*hit.length)] : hit;
     cRingAt(hp[0], hp[1], mirror);
     kRing.className='k-ring on';
+    /* A los 200ms el rival sube la guardia a la cara: si el hueco provocado
+       no estaba ya arriba (torso/costado, hy>0.22), el punto a tocar sube a
+       altura de cabeza (misma x, para no saltar de lado). */
+    if(hp[1] > 0.22){
+      C.guardUpTimer = setTimeout(function(){
+        if(C.state!=='pico_window') return;
+        cRingAt(hp[0], 0.10, mirror);
+      }, 200);
+    }
   } else {
     kRing.className='k-ring';
   }
@@ -1664,11 +1799,12 @@ function cPickPose(pose){
 }
 function cResolvePico(tap){
   if(C.state!=='pico_window') return;
-  clearTimeout(C.timer);
+  clearTimeout(C.timer); clearTimeout(C.guardUpTimer);
   var hit=C.pending.hit;
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
+    cAdjustPlanAmago(ok);
     if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
