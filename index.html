@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v28</div>
+    <div class="app-ver">v29</div>
     </div>
 
   </main>
@@ -1132,7 +1132,6 @@ var A_NAMES = {
 };
 var A_POOL = ['guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high',
   'block_cross','block_low','cover','guard_base','guard_closed'];
-var A_GUARD_MS = 250; // "tiempo" que cuenta en la media cuando el jugador acierta NO atacando una posición de guardia
 function aPickHit(spec){
   if(spec==null) return null;
   return Array.isArray(spec[0]) ? spec[Math.floor(Math.random()*spec.length)] : spec;
@@ -1362,8 +1361,15 @@ function kShowFlag(ok){
 function kNext(){
   if(K.rep>=K.total){ return kFinish(); }
   K.rep++;
-  K.state='guard';
   kUpdHud();
+  kAttempt();
+}
+/* Guardia + espera + disparo de la siguiente postura -- separado de kNext()
+   porque un señuelo (ver kFire) reintenta este mismo paso SIN sumar una
+   repetición nueva: solo cuenta como una de las 10 cuando de verdad hay
+   hueco para entrar. */
+function kAttempt(){
+  K.state='guard';
   kRing.className='k-ring'; kMark.className='k-mark';
   $('kFlag').className='k-flag';
   kLayout('guard_base', null, false);
@@ -1375,20 +1381,30 @@ function kNext(){
 function kMode(){ return S.s1==='atk' ? 'atk' : (S.s1==='cmb' ? 'cmb' : 'def'); }
 function kFire(){
   var atk = kMode()==='atk';
-  var pool = atk ? A_TECHS : K_TECHS;
-  var picked = pool[Math.floor(Math.random()*pool.length)];
   if(atk){
+    var picked = A_TECHS[Math.floor(Math.random()*A_TECHS.length)];
     var hp = aPickHit(picked.hitSpec);
-    K.tech = { s:picked.s, name:picked.name, hx:hp?hp[0]:null, hy:hp?hp[1]:null, guard:!hp };
+    if(!hp){
+      /* Señuelo: el rival cambia a otra postura de guardia sin hueco real.
+         No suena nada y NO cuenta como una de las 10 -- se enseña y, pasado
+         el mismo tiempo que duraría una repetición real, se reintenta el
+         MISMO número de repetición (kAttempt, no kNext). */
+      K.mirror = Math.random()<0.5;
+      kLayout(picked.s, null, K.mirror);
+      kRing.className='k-ring';
+      K.state='decoy';
+      K.timer=setTimeout(kAttempt, kWindow()+K_GRACE);
+      return;
+    }
+    K.tech = { s:picked.s, name:picked.name, hx:hp[0], hy:hp[1] };
   } else {
-    K.tech = picked;
+    K.tech = K_TECHS[Math.floor(Math.random()*K_TECHS.length)];
   }
   K.mirror = Math.random()<0.5;
   var winMs = kWindow()+K_GRACE;
   kLayout(K.tech.s, K.tech, K.mirror);
-  kRing.className = K.tech.guard ? 'k-ring' : 'k-ring on';
-  if(atk){ sndWhooshMove(); } // en Ataque: whoosh en cada cambio de postura del rival (sin kiai)
-  else if(!K.tech.guard){ sndKiai(S.gender); } // en Defensa: kiai solo con técnica real
+  kRing.className = 'k-ring on';
+  if(atk){ sndWhooshMove(); } else { sndKiai(S.gender); } // solo con hueco real (nunca en un señuelo)
   K.t0=performance.now();
   K.state='go';
   K.timer=setTimeout(function(){ kResolve(null); }, winMs);
@@ -1398,24 +1414,18 @@ function kResolve(tap){
   clearTimeout(K.timer);
   K.state='done';
   var atk = kMode()==='atk';
-  var isGuard = !!K.tech.guard;
-  var ok;
-  if(isGuard){
-    ok = !tap; // posición de guardia sin apertura: lo correcto es NO tocar
-  } else {
-    ok = tap && tap.onTarget && tap.dt<=kWindow();
-  }
+  var ok = tap && tap.onTarget && tap.dt<=kWindow();
   if(ok){
     K.def++; S.kDef=K.def;
-    S.times.push(isGuard ? A_GUARD_MS : Math.round(tap.dt)); // los fallos no meten tiempo en la media, solo cuentan como fallo
-    kRing.className = isGuard ? 'k-ring' : 'k-ring ok';
+    S.times.push(Math.round(tap.dt));
+    kRing.className = 'k-ring ok';
   } else {
     K.pt++;
-    kRing.className = isGuard ? 'k-ring' : 'k-ring no';
+    kRing.className = 'k-ring no';
   }
-  if(ok && tap){ sndPunch(); } // solo si hubo un toque de verdad que conectó (no al abstenerse en guardia)
+  if(ok && tap){ sndPunch(); } // solo si hubo un toque de verdad que conectó
   kShowFlag(ok);
-  kUpdRT(isGuard ? null : (tap && tap.dt!=null ? tap.dt : null));
+  kUpdRT(tap && tap.dt!=null ? tap.dt : null);
   $('kHudDef').textContent=(atk?'Acx ':'Def ')+K.def;
   $('kHudPt').textContent =(atk?'Fallos ':'Pts ')+K.pt;
   K.timer=setTimeout(kNext, K.pace==='paus' ? 1100 : 600);
