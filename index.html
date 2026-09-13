@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v29</div>
+    <div class="app-ver">v30</div>
     </div>
 
   </main>
@@ -1250,9 +1250,11 @@ applyCharHits();
 
 var K_WINDOW_CONT = 525; // ms para llegar a defender/atacar en "Seguido" (+50ms pedido 2026-09-13)
 var K_WINDOW_PAUS = 550; // ms para llegar a defender/atacar en "Espera" (+50ms pedido 2026-09-13)
+var K_ATK_EXTRA = 25; // Ataque 25ms más difícil que Defensa (pedido 2026-09-13)
 var K_GRACE  = 320;   // margen antes del punto automático
 function kWindow(){
   var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
+  if(kMode()==='atk'){ base -= K_ATK_EXTRA; }
   return base + (K.tech && K.tech.winBonus || 0);
 }
 
