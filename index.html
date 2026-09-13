@@ -346,8 +346,8 @@ if('serviceWorker' in navigator){
     </div>
 
     <div class="segment" id="seg2">
-      <button data-v="10">10</button>
-      <button class="sel" data-v="25">25</button>
+      <button class="sel" data-v="10">10</button>
+      <button data-v="25">25</button>
       <button data-v="50">50</button>
     </div>
 
@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v26</div>
+    <div class="app-ver">v27</div>
     </div>
 
   </main>
@@ -1374,7 +1374,7 @@ function kFire(){
   var winMs = kWindow()+K_GRACE;
   kLayout(K.tech.s, K.tech, K.mirror);
   kRing.className = K.tech.guard ? 'k-ring' : 'k-ring on';
-  if(!K.tech.guard){ sndKiai(S.gender); } // el rival tira técnica de verdad (no guardia/señuelo)
+  if(!atk && !K.tech.guard){ sndKiai(S.gender); } // solo en Defensa: en Ataque no suena kiai, solo el golpe del jugador
   K.t0=performance.now();
   K.state='go';
   K.timer=setTimeout(function(){ kResolve(null); }, winMs);
