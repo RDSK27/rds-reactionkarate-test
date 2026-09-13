@@ -414,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v38</div>
+    <div class="app-ver">v39</div>
     </div>
 
   </main>
@@ -1235,6 +1235,20 @@ function cAdjustPlanAmago(success){
 /* Posturas de guardia/bloqueo que el rival puede enseñar como "cambio de
    guardia" puramente decorativo (Plan): sin aro, sin nada que tocar. */
 var C_GUARD_POSES = ['guard_chest','guard_flank','guard_temple','guard_low','block_side','block_high','block_cross','block_low','cover','guard_closed'];
+/* En Combate, el pie llega más lejos y tarda más en verse venir -- muchas
+   técnicas de pierna hacían que el rival se escapara en puntos. Puñetazos
+   pesan el doble que patadas/rodillazo/barrido al elegir la técnica real
+   del rival (Defensa sigue con K_POOL a peso uniforme, sin tocar). Los
+   puntos en sí siempre suman 1, sea Yuko/Waza-ari/Ippon -- eso ya estaba
+   bien (C.scoreAka++/C.scoreAo++, sin ponderar por valor). */
+var C_ATK_WEIGHTS = { atk_jab:2, atk_cross:2, atk_combo:2, kick_front:1, kick_mid:1, kick_high:1, knee:1, kick_low:1, sweep_low:1 };
+function cPickTech(excludeName){
+  var keys = K_POOL.filter(function(k){ return k!==excludeName; });
+  var total=0; keys.forEach(function(k){ total += (C_ATK_WEIGHTS[k]||1); });
+  var r=Math.random()*total, acc=0;
+  for(var i=0;i<keys.length;i++){ acc += (C_ATK_WEIGHTS[keys[i]]||1); if(r<acc) return keys[i]; }
+  return keys[keys.length-1];
+}
 
 var K_NAMES = {
   atk_jab:'Puño adelantado', atk_cross:'Puño reverso', atk_combo:'Combinación',
@@ -1677,9 +1691,8 @@ function cBeginFeintAttack(){
   clearTimeout(C.timer);
   $('cAmagoBtn').disabled=true;
   C.state='rival_feint';
-  var fakeName = K_POOL[Math.floor(Math.random()*K_POOL.length)];
-  var realPool = K_POOL.filter(function(n){ return n!==fakeName; });
-  var realName = realPool[Math.floor(Math.random()*realPool.length)];
+  var fakeName = cPickTech();
+  var realName = cPickTech(fakeName);
   C.mirror = Math.random()<0.5;
   cShowPose(fakeName, null, C.mirror);
   kRing.className='k-ring'; // el amago no se toca, no hay aro
@@ -1701,7 +1714,7 @@ function cBeginAttack(){
   clearTimeout(C.timer);
   C.state='rival_attack';
   $('cAmagoBtn').disabled=true;
-  var name = K_POOL[Math.floor(Math.random()*K_POOL.length)];
+  var name = cPickTech();
   K.tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
   C.pending = K.tech;
   C.mirror = Math.random()<0.5;

@@ -1,5 +1,5 @@
 /* RDS Plantilla - Service Worker */
-var CACHE = 'reactionkarate-v38';
+var CACHE = 'reactionkarate-v39';
 var ASSETS = [
   './',
   './index.html',
