@@ -319,6 +319,16 @@ if('serviceWorker' in navigator){
   .c-amago-pip{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:.68rem; font-weight:900; background:rgba(255,255,255,.22); color:#fff; }
   .c-amago-pip.dim{ background:rgba(255,255,255,.08); color:rgba(255,255,255,.4); }
+
+  /* Pregunta "¿qué plan usó el rival?" al terminar un combate con Táctica. */
+  .c-plan-quiz{ position:absolute; inset:0; z-index:20; background:rgba(17,17,17,.94);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center; }
+  .cpq-q{ color:#fff; font-weight:900; letter-spacing:.08em; text-transform:uppercase; font-size:1rem; }
+  .cpq-opts{ display:flex; flex-direction:column; gap:10px; width:100%; max-width:220px; }
+  .cpq-opts button{ background:#333; color:#fff; border:0; border-radius:6px; padding:12px 18px; font-weight:900;
+    letter-spacing:.06em; text-transform:uppercase; font-size:.85rem; cursor:pointer; }
+  .cpq-opts button:active{ background:var(--rojo); }
+  .cpq-result{ font-size:1.15rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
 </style>
 </head>
 <body class="home-active">
@@ -404,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v35</div>
+    <div class="app-ver">v36</div>
     </div>
 
   </main>
@@ -477,6 +487,7 @@ if('serviceWorker' in navigator){
             <path class="k-flag-cloth" d="M12 5 C 38 -4, 42 17, 12 27 Z"/>
           </svg>
         </div>
+        <div class="c-plan-quiz" id="cPlanQuiz" style="display:none"></div>
       </div>
     </div>
     <div class="c-controls" id="cControls" style="display:none">
@@ -1845,12 +1856,39 @@ function cAwardPoint(side, value){
     }, 900);
   }, 1600);
 }
+var PLAN_LABELS = { a:'Plan A', b:'Plan B', c:'Plan C' };
 function cEndMatch(){
   C.active=false; C.paused=true;
   clearInterval(C.timerId); clearTimeout(C.timer);
   $('cAmagoBtn').disabled=true;
+  if(C.plan){ cAskPlanGuess(); } else { cShowMatchEndBanner(); }
+}
+function cShowMatchEndBanner(){
   var winner = C.scoreAka===C.scoreAo ? 'Empate' : (C.scoreAka>C.scoreAo ? 'Gana Aka' : 'Gana Ao');
   kSetStatus('Fin del combate · '+winner, 'end');
+}
+/* Al terminar un combate con Táctica activa, preguntar qué plan usó el
+   rival (igual que la lectura de táctica en Tenis) antes de mostrar el
+   resultado del combate. */
+function cAskPlanGuess(){
+  var el=$('cPlanQuiz'); if(!el){ cShowMatchEndBanner(); return; }
+  el.innerHTML = '<div class="cpq-q">¿Qué plan usó el rival?</div><div class="cpq-opts">'
+    + Object.keys(PLAN_LABELS).map(function(k){
+        return '<button data-v="'+k+'" onclick="cAnswerPlanGuess(\''+k+'\')">'+PLAN_LABELS[k]+'</button>';
+      }).join('')
+    + '</div>';
+  el.style.display='flex';
+}
+function cAnswerPlanGuess(guess){
+  var el=$('cPlanQuiz'); if(!el) return;
+  var ok = guess===C.plan;
+  el.innerHTML = '<div class="cpq-result" style="color:'+(ok?'#5ad17a':'#ef6a58')+'">'
+    + (ok ? 'Correcto: era '+PLAN_LABELS[C.plan] : 'Fallaste: era '+PLAN_LABELS[C.plan])
+    + '</div>';
+  setTimeout(function(){
+    el.style.display='none';
+    cShowMatchEndBanner();
+  }, 1800);
 }
 function cPointerDown(ev){
   if(!C.active) return;
