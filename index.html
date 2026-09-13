@@ -414,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v37</div>
+    <div class="app-ver">v38</div>
     </div>
 
   </main>
@@ -1204,11 +1204,13 @@ function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
    NOTA: "cambios de guardia" del Plan C = 2/min, igual que el Plan A, pese
    a que el propio Plan C se describe como el que más juega con el cambio
    de guardia -- se probó primero con 3/min (interpolando "Medio" entre el
-   2 de A y el 4 de B) pero el usuario confirmó que el número real es 2. */
+   2 de A y el 4 de B) pero el usuario confirmó que el número real es 2.
+   Ajuste posterior del mismo día: cambios de guardia x2 en los 3 planes,
+   y amagos rival +1 sobre el número de cada plan. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:7, guardPerMin:2, feintPerMin:3, defendStart:525, defendStep:10 },
-  b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:4, feintPerMin:2, defendStart:475, defendStep:10, amagoStart:300, amagoStep:10 },
-  c: { label:'Plan C · Provocación', atkPerMin:5, guardPerMin:2, feintPerMin:5 }
+  a: { label:'Plan A · Ataque',      atkPerMin:7, guardPerMin:4, feintPerMin:4, defendStart:525, defendStep:10 },
+  b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:8, feintPerMin:3, defendStart:475, defendStep:10, amagoStart:300, amagoStep:10 },
+  c: { label:'Plan C · Provocación', atkPerMin:5, guardPerMin:4, feintPerMin:6 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 function cWinDefend(){
@@ -1746,7 +1748,6 @@ function cAmagoStart(){
   $('cAmagoBtn').disabled=true;
   cPauseTimer();
   kRing.className='k-ring'; kMark.className='k-mark';
-  sndWhooshAmago();
 }
 function cNearestAmagoPose(hxF, hyF){
   var best=null, bestD=Infinity;
@@ -1759,6 +1760,7 @@ function cNearestAmagoPose(hxF, hyF){
 }
 function cResolveAmagoAim(ev){
   if(C.state!=='amago_aim') return;
+  sndWhooshAmago(); // el sonido va al tocar al karateka, no al pulsar el botón "Amago"
   var r = kKata.getBoundingClientRect();
   var hxF = (ev.clientX - r.left) / r.width;
   var hyF = (ev.clientY - r.top) / r.height;
