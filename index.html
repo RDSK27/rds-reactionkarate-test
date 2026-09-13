@@ -414,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v39</div>
+    <div class="app-ver">v40</div>
     </div>
 
   </main>
@@ -1238,9 +1238,11 @@ var C_GUARD_POSES = ['guard_chest','guard_flank','guard_temple','guard_low','blo
 /* En Combate, el pie llega más lejos y tarda más en verse venir -- muchas
    técnicas de pierna hacían que el rival se escapara en puntos. Puñetazos
    pesan el doble que patadas/rodillazo/barrido al elegir la técnica real
-   del rival (Defensa sigue con K_POOL a peso uniforme, sin tocar). Los
-   puntos en sí siempre suman 1, sea Yuko/Waza-ari/Ippon -- eso ya estaba
-   bien (C.scoreAka++/C.scoreAo++, sin ponderar por valor). */
+   del rival (Defensa sigue con K_POOL a peso uniforme, sin tocar). El
+   marcador en sí SÍ pondera por valor (Yuko=1/Waza-ari=2/Ippon=3, ver
+   C_POINT_VALUES junto a cAwardPoint) -- esto compensa parte del problema
+   por sí solo, pero no evita que el rival encadene ippons con patadas si
+   no se reparte también la frecuencia de técnicas. */
 var C_ATK_WEIGHTS = { atk_jab:2, atk_cross:2, atk_combo:2, kick_front:1, kick_mid:1, kick_high:1, knee:1, kick_low:1, sweep_low:1 };
 function cPickTech(excludeName){
   var keys = K_POOL.filter(function(k){ return k!==excludeName; });
@@ -1838,11 +1840,13 @@ function cShowFlagColor(color){
   el.className='k-flag show '+color;
   kFlagTimer=setTimeout(function(){ el.classList.remove('show'); }, 550);
 }
+var C_POINT_VALUES = { yuko:1, 'waza-ari':2, ippon:3 }; // el marcador SÍ pondera por valor (corregido 2026-09-13)
 function cAwardPoint(side, value){
   cPauseTimer();
   sndWhistle(); // marca que el combate se para tras la técnica, antes de anunciar el punto
   var color = cActorColor(side);
-  if(color==='aka') C.scoreAka++; else C.scoreAo++;
+  var pts = C_POINT_VALUES[value]||1;
+  if(color==='aka') C.scoreAka+=pts; else C.scoreAo+=pts;
   cUpdateScore();
   kRing.className='k-ring'; kMark.className='k-mark';
   cShowFlagColor(color);
