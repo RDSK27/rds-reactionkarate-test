@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v31</div>
+    <div class="app-ver">v32</div>
     </div>
 
   </main>
@@ -1676,6 +1676,7 @@ function cShowFlagColor(color){
 }
 function cAwardPoint(side, value){
   cPauseTimer();
+  sndWhistle(); // marca que el combate se para tras la técnica, antes de anunciar el punto
   var color = cActorColor(side);
   if(color==='aka') C.scoreAka++; else C.scoreAo++;
   cUpdateScore();
