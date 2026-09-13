@@ -385,7 +385,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v20</div>
+    <div class="app-ver">v21</div>
     </div>
 
   </main>
@@ -1080,7 +1080,14 @@ var K_NAMES = {
   knee:'Rodillazo', kick_low:'Patada baja', sweep_low:'Barrido bajo'
 };
 var K_POOL = ['atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_high','knee','kick_low','sweep_low'];
-var K_SC   = { sweep_low:1.25 };
+/* K_SC: boost de escala extra por técnica, aparte del máximo que ya calcula
+   kLayout() para que quepa en el cuadro. sweep_low llevaba 1.25 (heredado
+   del set de sprites cartoon viejo, donde la pose agachada se veía pequeña
+   sin ese empujón) -- con las proporciones reales del set nuevo (v20) la
+   escala SIN boost ya toca el límite de alto del cuadro (0.85*SH), así que
+   aplicar encima un 25% más sacaba al karateca del cuadro por arriba y por
+   los lados (visto 2026-09-13: top llegaba a -70px con SH=434). Sin boost. */
+var K_SC   = {};
 var K_WINBONUS = { kick_low:50, sweep_low:100 }; // ms extra de margen para técnicas más difíciles de ver venir
 var K_TECHS; /* se construye en applyCharHits(), depende de K_HITS del personaje actual */
 
