@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v32</div>
+    <div class="app-ver">v33</div>
     </div>
 
   </main>
@@ -1163,12 +1163,26 @@ var C_DEFENDS = {
    tocar para provocar cada postura de defensa -- calibrado en calibrar.html
    (sección "Amago"), POR PERSONAJE igual que A_HITS/K_HITS/C_COUNTERS. */
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
-/* Baremos de Combate más fáciles que Defensa/Ataque mientras se prueba el
-   modo completo -- el usuario pidió +100ms en todo para probar, se irá
-   afinando más adelante. */
-var C_EXTRA_MS = 100;     // margen extra sobre kWindow() para el ataque real del rival en Combate
-var C_WIN_PICO = 400;    // ms para entrar al hueco tras un pique (antes 300)
-var C_WIN_PARAR = 350;   // ms para contraatacar tras parar una técnica del rival (antes 250)
+/* Márgenes de Combate (pedido 2026-09-13): defender el ataque real del
+   rival por debajo de 500ms (antes 650 = kWindow()+C_EXTRA_MS); pico y
+   parar-contraatacar se quedan en su base de siempre pero ahora son
+   ADAPTATIVOS -- si el jugador gana por más de 2 puntos, se complican
+   10ms por cada punto de ventaja adicional (ver cWinPico()/cWinParar()). */
+var C_WIN_DEFEND = 480;  // ms para parar/defender el ataque real del rival en Combate
+var C_WIN_PICO_BASE = 400;  // ms base para entrar al hueco tras un pique
+var C_WIN_PARAR_BASE = 350; // ms base para contraatacar tras parar una técnica del rival
+/* Penalización adaptativa: 10ms por cada punto de ventaja del jugador por
+   encima de 2 (ventaja 3 -> -10ms, ventaja 4 -> -20ms, etc.). Se acota sola
+   por la regla de corte a 8 puntos de diferencia (cEndMatch), no hace falta
+   un suelo aparte. */
+function cAdaptivePenalty(){
+  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  var lead = playerScore - rivalScore;
+  return lead>2 ? (lead-2)*10 : 0;
+}
+function cWinPico(){ return C_WIN_PICO_BASE - cAdaptivePenalty(); }
+function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
 
 var K_NAMES = {
   atk_jab:'Puño adelantado', atk_cross:'Puño reverso', atk_combo:'Combinación',
@@ -1443,9 +1457,9 @@ function kFinish(){
    el combate y muestra "COMBATE PARADO") y toca directamente sobre la
    guardia neutra; el punto calibrado más cercano (C_AMAGO_POINTS) decide
    qué postura de defensa activa el rival, dejando abierta su propia diana
-   ya calibrada (A_HITS) — margen C_WIN_PICO. El rival también puede atacar
+   ya calibrada (A_HITS) — margen cWinPico(). El rival también puede atacar
    por su cuenta. Si el jugador para un ataque real del rival a tiempo y esa
-   técnica tiene contraataque (C_COUNTERS), se abre una ventana C_WIN_PARAR
+   técnica tiene contraataque (C_COUNTERS), se abre una ventana cWinParar()
    para rematar. Los puntos paran el reloj. Nº de amagos por combate:
    C_AMAGOS_PER_MIN por cada minuto de duración.
    =================================================================== */
@@ -1570,14 +1584,14 @@ function cBeginAttack(){
   cShowPose(K.tech.s, K.tech, C.mirror);
   kRing.className='k-ring on';
   C.t0=performance.now();
-  var win = kWindow()+C_EXTRA_MS+K_GRACE;
+  var win = C_WIN_DEFEND+K_GRACE;
   C.timer=setTimeout(function(){ cResolveAttack(null); }, win);
 }
 function cResolveAttack(tap){
   if(C.state!=='rival_attack') return;
   clearTimeout(C.timer);
   var tech=C.pending;
-  var ok = tap && tap.onTarget && tap.dt<=kWindow()+C_EXTRA_MS;
+  var ok = tap && tap.onTarget && tap.dt<=C_WIN_DEFEND;
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
   var ctr = C_COUNTERS[tech.s];
@@ -1586,12 +1600,12 @@ function cResolveAttack(tap){
   cRingAt(ctr[0], ctr[1], C.mirror);
   kRing.className='k-ring on';
   C.t0=performance.now();
-  C.timer=setTimeout(function(){ cResolveCounter(null); }, C_WIN_PARAR);
+  C.timer=setTimeout(function(){ cResolveCounter(null); }, cWinParar());
 }
 function cResolveCounter(tap){
   if(C.state!=='counter_window') return;
   clearTimeout(C.timer);
-  var ok = tap && tap.onTarget && tap.dt<=C_WIN_PARAR;
+  var ok = tap && tap.onTarget && tap.dt<=cWinParar();
   C.state='done';
   if(ok){ cAwardPoint('player', C_COUNTER_VALUES[C.pending.s]||'yuko'); }
   else { C.timer=setTimeout(cParado, 500); }
@@ -1646,7 +1660,7 @@ function cPickPose(pose){
     kRing.className='k-ring';
   }
   C.t0=performance.now();
-  C.timer=setTimeout(function(){ cResolvePico(null); }, C_WIN_PICO);
+  C.timer=setTimeout(function(){ cResolvePico(null); }, cWinPico());
 }
 function cResolvePico(tap){
   if(C.state!=='pico_window') return;
@@ -1654,7 +1668,7 @@ function cResolvePico(tap){
   var hit=C.pending.hit;
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
-    var ok = tap && tap.onTarget && tap.dt<=C_WIN_PICO;
+    var ok = tap && tap.onTarget && tap.dt<=cWinPico();
     if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
