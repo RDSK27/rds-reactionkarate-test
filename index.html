@@ -414,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v36</div>
+    <div class="app-ver">v37</div>
     </div>
 
   </main>
@@ -444,12 +444,6 @@ if('serviceWorker' in navigator){
     <div class="segment" id="segStrategy" style="display:none">
       <button class="sel" data-v="libre">Libre</button>
       <button data-v="tactica">Táctica</button>
-    </div>
-
-    <div class="segment" id="segPlan" style="display:none">
-      <button class="sel" data-v="a">Plan A</button>
-      <button data-v="b">Plan B</button>
-      <button data-v="c">Plan C</button>
     </div>
   </main>
   <div class="results-actions">
@@ -724,7 +718,7 @@ function setSeg(id,val){
 var S={ s1:'a', s2:'a', s3:'a', name:'RDS', sport:'', t0:0, times:[],
         resAvg:NaN, resTotal:0, resEnsayos:0, saved:null,
         lastRec:null, lastRecKey:null, rankKey:null,
-        color:'aka', gender:'m', cTime:60, cStrategy:'libre', cPlan:'a' };
+        color:'aka', gender:'m', cTime:60, cStrategy:'libre' };
 
 function filterInitials(el){ el.value=el.value.replace(/[^A-Za-z]/g,'').toUpperCase(); }
 
@@ -750,8 +744,6 @@ function openMatchSetup(){
   setSeg('segGender', S.gender);
   setSeg('segTime', String(S.cTime));
   setSeg('segStrategy', S.cStrategy);
-  setSeg('segPlan', S.cPlan);
-  $('segPlan').style.display = (cmb && S.cStrategy==='tactica') ? 'flex' : 'none';
   show('matchsetup');
 }
 function confirmMatchSetup(){
@@ -760,7 +752,6 @@ function confirmMatchSetup(){
   if(S.s1==='cmb'){
     S.cTime = parseInt(selVal('segTime'),10)||60;
     S.cStrategy = selVal('segStrategy')||'libre';
-    S.cPlan = selVal('segPlan')||'a';
   }
   preloadSprites();
   applyCharHits();
@@ -1008,11 +999,7 @@ $('seg1').addEventListener('click', function(e){
 
 /* ---------- Wiring ---------- */
 seg('seg1'); seg('seg2'); seg('seg3');
-seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy'); seg('segPlan');
-$('segStrategy').addEventListener('click', function(e){
-  var b=e.target.closest('button'); if(!b) return;
-  $('segPlan').style.display = (b.getAttribute('data-v')==='tactica') ? 'flex' : 'none';
-});
+seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
 segRank('seg1R'); segRank('seg2R'); segRank('seg3R');
 $('btnRank2').addEventListener('click', showRanking);
 $('btnGuardar').addEventListener('click', function(){
@@ -1550,7 +1537,10 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
-  C.plan = (S.cStrategy==='tactica') ? (S.cPlan||'a') : null;
+  /* Con Táctica, el PLAN lo elige el juego al azar -- el jugador no lo ve,
+     solo tiene que reconocerlo al final del combate (cAskPlanGuess). */
+  var PLAN_KEYS = Object.keys(PLAN_CONFIG);
+  C.plan = (S.cStrategy==='tactica') ? PLAN_KEYS[Math.floor(Math.random()*PLAN_KEYS.length)] : null;
   var planCfg = C.plan && PLAN_CONFIG[C.plan];
   C.planDefend = (planCfg && planCfg.defendStart!=null) ? planCfg.defendStart : null;
   C.planAmago  = (planCfg && planCfg.amagoStart!=null)  ? planCfg.amagoStart  : null;
