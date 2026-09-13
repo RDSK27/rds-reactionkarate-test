@@ -1,20 +1,33 @@
-Sonidos de kiai (Ataque/Defensa) — origen y licencia (Attribution 4.0 / CC-BY 4.0):
+Sonidos de kiai/whoosh (Ataque/Defensa/Combate) — origen y licencia:
 
 kiai_m1.wav
   Recortado de "Male Attack Grunt 1.wav"
-  Autor: F.M.Audio
+  Autor: F.M.Audio · Attribution 4.0
   https://freesound.org/people/F.M.Audio/sounds/695378/
 
 kiai_m2.wav
   Recortado de "Male Attack Grunt 7.wav"
-  Autor: F.M.Audio
+  Autor: F.M.Audio · Attribution 4.0
   https://freesound.org/people/F.M.Audio/sounds/695382/
 
 kiai_f1.wav, kiai_f2.wav
   Recortados de "Fighting Game grunts - young female.wav"
-  Autor: AderuMoro
+  Autor: AderuMoro · Attribution 4.0
   https://freesound.org/people/AderuMoro/sounds/213295/
 
-Licencia Attribution 4.0: libres de usar/modificar, pero hay que citar al
-autor. Si la app se publica, añadir estos créditos en algún sitio visible
-(pantalla de créditos, footer, etc.) — pendiente de decidir DÓNDE mostrarlo.
+whoosh_move.wav
+  "foley_cable_whoosh_air_002.wav" (sin recortar)
+  Autor: soundscalpel.com · Attribution 3.0
+  https://freesound.org/people/soundscalpel.com/sounds/110616/
+  Uso: Ataque, cambio de postura del rival (en vez de kiai).
+
+whoosh_amago.wav
+  Recortado de "Swoosh Punch.wav"
+  Autor: -GeorgeDiamond- · Attribution 4.0
+  https://freesound.org/people/-GeorgeDiamond-/sounds/578643/
+  Uso: Combate, al pulsar "Amago".
+
+Licencias Attribution (3.0/4.0): libres de usar/modificar, pero hay que
+citar al autor. Si la app se publica, añadir estos créditos en algún sitio
+visible (pantalla de créditos, footer, etc.) — pendiente de decidir DÓNDE
+mostrarlo.
