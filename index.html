@@ -291,23 +291,23 @@ if('serviceWorker' in navigator){
   .k-flag.ao .k-flag-cloth{ fill:#1565d8; }
 
   /* ---- Modo Combate ---- */
-  .c-hud{ display:flex; justify-content:space-between; align-items:center; padding:9px 18px; background:#111; flex-shrink:0; }
+  .c-hud{ display:flex; justify-content:center; align-items:center; gap:28px; padding:9px 18px; background:#111; flex-shrink:0; }
   .c-score{ width:52px; height:38px; border-radius:6px; display:flex; align-items:center; justify-content:center;
     font-weight:900; font-size:1.25rem; color:#fff; box-shadow:inset 0 0 0 2px rgba(255,255,255,.25); }
   .c-score-aka{ background:#c6302a; } .c-score-ao{ background:#1565d8; }
   .c-timer{ font-family:Arial,Helvetica,sans-serif; font-size:1.3rem; font-weight:900; color:#fff; letter-spacing:.04em; }
   .c-timer.low{ color:#ef6a58; }
-  /* El "¡Hajime!" siempre a la altura del pecho (delante del rival), tanto en
-     Ataque/Defensa como en Combate -- ver .cmb-mode .k-status más abajo, que
-     hace lo mismo con el resto de banners solo dentro de Combate. */
+  /* El "¡Hajime!" siempre a la altura del pecho (delante del rival), en los
+     3 modos -- el resto de mensajes (punto anotado, fin de combate) usan la
+     posición por defecto de .k-status (pegados a la banda de arriba). */
   .k-status.hajime{ top:38%; left:6%; right:6%; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.4);
     background:rgba(17,17,17,.96); font-size:1.4rem; letter-spacing:.24em; padding:10px 0; }
   .k-status.point{ background:rgba(162,58,41,.96); font-size:1.05rem; }
   .k-status.pointao{ background:rgba(21,101,216,.94); font-size:1.05rem; }
   .k-status.end{ background:rgba(17,17,17,.96); font-size:1.05rem; letter-spacing:.08em; }
-  /* En Combate el texto va a la altura del pecho del rival (delante de él,
-     donde el jugador ya tiene la vista puesta) en vez de arriba del todo. */
-  .cmb-mode .k-status{ top:38%; left:6%; right:6%; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.4); }
+  /* En Combate, el "¡Hajime!" va a la altura del pecho (ver .k-status.hajime
+     arriba, ya vale para los 3 modos); el resto de mensajes (punto anotado,
+     fin de combate) van pegados a la banda de marcador/tiempo, no al pecho. */
   .k-status.pop{ animation:kStatusPop .38s cubic-bezier(.34,1.56,.64,1); }
   @keyframes kStatusPop{ 0%{transform:scale(1);} 40%{transform:scale(1.22);} 100%{transform:scale(1);} }
   .c-controls{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 14px; flex-shrink:0; }
@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v30</div>
+    <div class="app-ver">v31</div>
     </div>
 
   </main>
@@ -426,8 +426,8 @@ if('serviceWorker' in navigator){
     </div>
 
     <div class="segment" id="segTime" style="display:none">
-      <button data-v="60">1 min</button>
-      <button class="sel" data-v="120">2 min</button>
+      <button class="sel" data-v="60">1 min</button>
+      <button data-v="120">2 min</button>
       <button data-v="180">3 min</button>
     </div>
 
@@ -707,7 +707,7 @@ function setSeg(id,val){
 var S={ s1:'a', s2:'a', s3:'a', name:'RDS', sport:'', t0:0, times:[],
         resAvg:NaN, resTotal:0, resEnsayos:0, saved:null,
         lastRec:null, lastRecKey:null, rankKey:null,
-        color:'aka', gender:'m', cTime:120, cStrategy:'libre' };
+        color:'aka', gender:'m', cTime:60, cStrategy:'libre' };
 
 function filterInitials(el){ el.value=el.value.replace(/[^A-Za-z]/g,'').toUpperCase(); }
 
@@ -739,7 +739,7 @@ function confirmMatchSetup(){
   S.color = selVal('segColor')||'aka';
   S.gender = selVal('segGender')||'m';
   if(S.s1==='cmb'){
-    S.cTime = parseInt(selVal('segTime'),10)||120;
+    S.cTime = parseInt(selVal('segTime'),10)||60;
     S.cStrategy = selVal('segStrategy')||'libre';
   }
   preloadSprites();
@@ -1469,7 +1469,7 @@ function cAbort(){ clearTimeout(C.timer); clearInterval(C.timerId); C.active=fal
 function cStart(){
   clearTimeout(C.timer); clearInterval(C.timerId);
   C.scoreAka=0; C.scoreAo=0;
-  C.timeLeft = S.cTime||120;
+  C.timeLeft = S.cTime||60;
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
@@ -1477,12 +1477,22 @@ function cStart(){
   cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
   $('cAmagoBtn').disabled=true;
   kRing.className='k-ring'; kMark.className='k-mark';
+  kSetStatus('');
   C.mirror = Math.random()<0.5;
+  /* Entrada igual que Ataque/Defensa: guardia -> saludo -> guardia + Hajime. */
   cShowPose('guard_base', null, C.mirror);
-  kSetStatus('¡Hajime!','hajime');
   C.timer=setTimeout(function(){
-    C.paused=false; cResumeTimer(); cParado();
-  }, 1400);
+    cShowPose('saludo', null, C.mirror);
+    C.timer=setTimeout(function(){
+      cShowPose('guard_base', null, C.mirror);
+      kSetStatus('¡Hajime!','hajime');
+      sndWhistle();
+      C.timer=setTimeout(function(){
+        kSetStatus('');
+        C.paused=false; cResumeTimer(); cParado();
+      }, 900);
+    }, 900);
+  }, 500);
 }
 function cRenderAmagoPips(){
   var el = $('cAmagoPips'); if(!el) return;
@@ -1656,16 +1666,35 @@ function cResolvePico(tap){
   }
 }
 
+/* Bandera del color que anota el punto (aka=rojo, ao=azul) -- reutiliza el
+   mismo elemento #kFlag y kFlagTimer de Ataque/Defensa. */
+function cShowFlagColor(color){
+  var el=$('kFlag'); if(!el) return;
+  clearTimeout(kFlagTimer);
+  el.className='k-flag show '+color;
+  kFlagTimer=setTimeout(function(){ el.classList.remove('show'); }, 550);
+}
 function cAwardPoint(side, value){
   cPauseTimer();
   var color = cActorColor(side);
   if(color==='aka') C.scoreAka++; else C.scoreAo++;
   cUpdateScore();
   kRing.className='k-ring'; kMark.className='k-mark';
-  kSetStatus((C_TERM[value]||value).toUpperCase(), color==='aka'?'point':'pointao');
+  cShowFlagColor(color);
+  cShowPose('saludo', null, C.mirror); // el rival saluda mientras se anuncia el punto
+  kSetStatus((C_TERM[value]||value)+' de '+(color==='aka'?'Aka':'Ao'), color==='aka'?'point':'pointao');
   var diff = Math.abs(C.scoreAka - C.scoreAo);
   if(diff>=8){ C.timer=setTimeout(function(){ cEndMatch('diff'); }, 1400); return; }
-  C.timer=setTimeout(function(){ if(C.active){ C.paused=false; cParado(); } }, 1600);
+  C.timer=setTimeout(function(){
+    kSetStatus('');
+    cShowPose('guard_base', null, C.mirror);
+    kSetStatus('¡Hajime!','hajime');
+    sndWhistle();
+    C.timer=setTimeout(function(){
+      kSetStatus('');
+      if(C.active){ C.paused=false; cParado(); }
+    }, 900);
+  }, 1600);
 }
 function cEndMatch(){
   C.active=false; C.paused=true;
