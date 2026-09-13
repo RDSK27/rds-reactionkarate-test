@@ -1,0 +1,20 @@
+Sonidos de kiai (Ataque/Defensa) — origen y licencia (Attribution 4.0 / CC-BY 4.0):
+
+kiai_m1.wav
+  Recortado de "Male Attack Grunt 1.wav"
+  Autor: F.M.Audio
+  https://freesound.org/people/F.M.Audio/sounds/695378/
+
+kiai_m2.wav
+  Recortado de "Male Attack Grunt 7.wav"
+  Autor: F.M.Audio
+  https://freesound.org/people/F.M.Audio/sounds/695382/
+
+kiai_f1.wav, kiai_f2.wav
+  Recortados de "Fighting Game grunts - young female.wav"
+  Autor: AderuMoro
+  https://freesound.org/people/AderuMoro/sounds/213295/
+
+Licencia Attribution 4.0: libres de usar/modificar, pero hay que citar al
+autor. Si la app se publica, añadir estos créditos en algún sitio visible
+(pantalla de créditos, footer, etc.) — pendiente de decidir DÓNDE mostrarlo.

@@ -404,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v25</div>
+    <div class="app-ver">v26</div>
     </div>
 
   </main>
@@ -614,6 +614,65 @@ function tone(type,f0,f1,start,dur,vol){
   o.start(start); o.stop(start+dur+0.03);
 }
 function sndButton(){ var c=audioCtx(); if(!c) return; tone('triangle',520,0,c.currentTime,0.055,0.16); }
+
+/* ---------- Sonidos de Ataque/Defensa (2026-09-13) ----------
+   Silbato y golpe: sintetizados (Web Audio, igual que sndButton), elegidos
+   por el usuario tras auditar variantes en una consola de pruebas aparte.
+   Kiai: intentamos sintetizarlo (vocal con formantes) y sonaba mal en las
+   dos rondas -- el usuario pidió en su lugar clips reales cortos, sacados
+   de Freesound (licencia Attribution 4.0, ver assets/sfx/CREDITOS.txt). */
+var _noiseBuf=null;
+function noiseBuffer(ctx){
+  if(_noiseBuf) return _noiseBuf;
+  var len=Math.floor(ctx.sampleRate*0.5);
+  var buf=ctx.createBuffer(1,len,ctx.sampleRate);
+  var data=buf.getChannelData(0);
+  for(var i=0;i<len;i++){ data[i]=Math.random()*2-1; }
+  _noiseBuf=buf;
+  return buf;
+}
+function sndWhistle(){
+  var ctx=audioCtx(); if(!ctx) return;
+  var t0=ctx.currentTime;
+  var o=ctx.createOscillator(), g=ctx.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(2450,t0);
+  var lfo=ctx.createOscillator(), lg=ctx.createGain();
+  lfo.frequency.value=6.5; lg.gain.value=16;
+  lfo.connect(lg); lg.connect(o.frequency);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.linearRampToValueAtTime(0.2,t0+0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+0.4);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(t0); lfo.start(t0);
+  o.stop(t0+0.42); lfo.stop(t0+0.42);
+}
+function sndPunch(){
+  var ctx=audioCtx(); if(!ctx) return;
+  var t0=ctx.currentTime;
+  var o=ctx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(150,t0);
+  o.frequency.exponentialRampToValueAtTime(48,t0+0.09);
+  var og=ctx.createGain();
+  og.gain.setValueAtTime(0.55,t0);
+  og.gain.exponentialRampToValueAtTime(0.0001,t0+0.2);
+  o.connect(og); og.connect(ctx.destination);
+  o.start(t0); o.stop(t0+0.22);
+  var noise=ctx.createBufferSource(); noise.buffer=noiseBuffer(ctx);
+  var hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1900;
+  var ng=ctx.createGain();
+  ng.gain.setValueAtTime(0.34,t0);
+  ng.gain.exponentialRampToValueAtTime(0.0001,t0+0.07);
+  noise.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
+  noise.start(t0); noise.stop(t0+0.1);
+}
+var KIAI_SFX = { m:['assets/sfx/kiai_m1.wav','assets/sfx/kiai_m2.wav'], f:['assets/sfx/kiai_f1.wav','assets/sfx/kiai_f2.wav'] };
+function sndKiai(gender){
+  var pool = KIAI_SFX[gender==='f'?'f':'m'];
+  var src = pool[Math.floor(Math.random()*pool.length)];
+  var a = new Audio(src);
+  a.volume=0.85;
+  a.play().catch(function(){});
+}
 
 /* ---------- Selectores segmentados ---------- */
 function seg(id){
@@ -1254,6 +1313,7 @@ function kStart(){
     K.timer=setTimeout(function(){
       kLayout('guard_base', null, false);
       kSetStatus('¡Hajime!','hajime');
+      sndWhistle();
       K.timer=setTimeout(function(){
         kSetStatus('');
         S.t0=performance.now();
@@ -1314,6 +1374,7 @@ function kFire(){
   var winMs = kWindow()+K_GRACE;
   kLayout(K.tech.s, K.tech, K.mirror);
   kRing.className = K.tech.guard ? 'k-ring' : 'k-ring on';
+  if(!K.tech.guard){ sndKiai(S.gender); } // el rival tira técnica de verdad (no guardia/señuelo)
   K.t0=performance.now();
   K.state='go';
   K.timer=setTimeout(function(){ kResolve(null); }, winMs);
@@ -1338,6 +1399,7 @@ function kResolve(tap){
     K.pt++;
     kRing.className = isGuard ? 'k-ring' : 'k-ring no';
   }
+  if(ok && tap){ sndPunch(); } // solo si hubo un toque de verdad que conectó (no al abstenerse en guardia)
   kShowFlag(ok);
   kUpdRT(isGuard ? null : (tap && tap.dt!=null ? tap.dt : null));
   $('kHudDef').textContent=(atk?'Acx ':'Def ')+K.def;
