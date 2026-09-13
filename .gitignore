@@ -7,3 +7,8 @@ _c.js
 _blk*.js
 _chk.js
 .DS_Store
+
+# material fuente para generar sprites (fotos/láminas de referencia), no parte de la app
+Imágenes de ejemplo/
+Técnicas/
+IMG_*.JPG

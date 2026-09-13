@@ -7,7 +7,7 @@
 <style>
   :root{ --rojo:#A23A29; --rojo2:#b03020; }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-  body{font-family:Arial,Helvetica,sans-serif;background:#c9cdd1;color:#111;padding-bottom:96px;}
+  body{font-family:Arial,Helvetica,sans-serif;background:#c9cdd1;color:#111;padding-bottom:96px;overflow-x:hidden;}
   header{background:#000;color:#fff;border-bottom:4px solid var(--rojo2);padding:10px 14px;position:sticky;top:0;z-index:20;}
   header b{letter-spacing:.1em;text-transform:uppercase;font-size:.95rem;}
   header p{color:#cfcfcf;font-size:.66rem;margin-top:3px;line-height:1.4;}
@@ -61,6 +61,11 @@
   #out{flex:1;min-width:0;background:#111;color:#7CFC9A;font-family:monospace;font-size:.62rem;
     border:1px solid #444;border-radius:4px;padding:8px;height:52px;resize:none;}
   .tip{font-size:.62rem;color:#777;padding:2px 14px 0;}
+  .charbar{display:flex;gap:0;position:sticky;top:64px;z-index:19;border-bottom:3px solid var(--rojo2);}
+  .charbar button{flex:1;background:#222;color:#ccc;border:0;border-right:1px solid #444;padding:10px 4px;
+    font-weight:900;letter-spacing:.04em;text-transform:uppercase;font-size:.68rem;cursor:pointer;}
+  .charbar button:last-child{border-right:0;}
+  .charbar button.sel{background:var(--rojo);color:#fff;}
 </style>
 </head>
 <body>
@@ -69,8 +74,17 @@
   <p>Arrastra el aro de cada imagen al sitio exacto que hay que tocar. En los ataques: el puño o el pie que golpea. En guardias/defensas: la zona abierta que hay que atacar. Si una postura no deja ninguna zona abierta (está defendiendo todo / en guardia), marca la casilla "Sin sitio de ataque" en vez de poner un aro.<br><br>
   <b>Nuevo para Modo Combate</b> — En cada ataque: marca su valor (Yuko/Waza-ari/Ippon) y, si al pararlo dejas al rival con algún hueco para contraatacar, el punto verde de "Punto de contraataque" (si no expone nada, marca "Sin contraataque"). En cada guardia/defensa: elige qué zona defiende (el pique que provoca que el rival adopte esa postura).<br><br>
   <b>Amago (abajo del todo)</b> — para cada postura, arrastra el aro sobre la GUARDIA NEUTRA (imagen de la izquierda) al punto exacto donde habría que tocar para provocar que el rival cambie a la postura de la derecha.<br><br>
+  <b>4 personajes</b> — elige abajo cuál calibras. Cada uno guarda y exporta sus propias dianas por separado
+  (las proporciones no son idénticas entre ellos). Repite el proceso completo para los 4 y pégame los 4
+  textos exportados.<br><br>
   Luego pulsa EXPORTAR y me pegas el texto.</p>
 </header>
+<div class="charbar" id="charbar">
+  <button class="sel" data-v="m_aka">M · AKA</button>
+  <button data-v="m_ao">M · AO</button>
+  <button data-v="f_aka">F · AKA</button>
+  <button data-v="f_ao">F · AO</button>
+</div>
 <div id="list"></div>
 <p class="tip" id="progress"></p>
 <footer>
@@ -92,49 +106,119 @@ var GROUPS = [
     'guard_closed','guard_chest','guard_flank','guard_temple','guard_low',
     'block_side','block_high','block_cross','block_low','cover' ] }
 ];
+/* v7: los defaults/semillas para un personaje SIN calibrar todavía (de
+   momento f_aka y f_ao) ya NO son del set cartoon viejo -- son la
+   calibración real de Masculino AO (2026-09-13), el punto de partida más
+   parecido que hay. Así solo hay que REVISAR/ajustar cada aro en vez de
+   colocarlo desde cero. Cuando un personaje SÍ tiene guardado en
+   localStorage, esos valores mandan sobre esta semilla igualmente. */
 var DEFAULTS = {
-  atk_jab:[0.821,0.168], atk_cross:[0.875,0.226], atk_combo:[0.515,0.221],
-  kick_front:[0.51,0.36], kick_mid:[0.743,0.396], kick_high:[0.909,0.108], knee:[0.784,0.435],
-  kick_low:[0.222,0.661], sweep_low:[0.116,0.875],
-  guard_chest:[0.497,0.12], guard_flank:[0.503,0.115], guard_temple:[0.611,0.133],
-  guard_low:[0.5,0.13], block_side:[0.6,0.113], block_high:[0.695,0.351],
-  block_cross:[0.544,0.14], block_low:[0.601,0.126], cover:[[0.753,0.393],[0.247,0.393]],
-  guard_base:null, guard_closed:null
+  atk_jab:[0.392,0.23], atk_cross:[0.907,0.231], atk_combo:[0.896,0.218], kick_front:[0.881,0.305],
+  kick_mid:[0.902,0.186], kick_high:[0.895,0.083], knee:[0.856,0.388], kick_low:[0.697,0.411], sweep_low:[0.117,0.895],
+  guard_base:null, guard_closed:null, guard_chest:[0.497,0.091], guard_flank:[0.458,0.093],
+  guard_temple:[0.507,0.101], guard_low:[0.513,0.1], block_side:[0.447,0.091], block_high:[0.682,0.373],
+  block_cross:[[0.616,0.413],[0.335,0.411]], block_low:[0.482,0.098], cover:[0.57,0.078]
 };
 var VALUES = [['yuko','Yuko'],['waza-ari','Waza-ari'],['ippon','Ippon']];
 var DEFAULT_VALUE = {
   atk_jab:'yuko', atk_cross:'yuko', atk_combo:'yuko', kick_front:'waza-ari',
   kick_mid:'waza-ari', kick_high:'ippon', knee:'waza-ari', kick_low:'waza-ari', sweep_low:'ippon'
 };
+var DEFAULT_COUNTER = {
+  atk_jab:[0.503,0.091], atk_cross:[0.415,0.376], atk_combo:[0.426,0.096], kick_front:[0.25,0.095],
+  kick_mid:[0.22,0.101], kick_high:[0.199,0.118], knee:[0.519,0.098], kick_low:[0.23,0.105], sweep_low:[0.621,0.121]
+};
+var DEFAULT_AMAGO = {
+  guard_closed:[0.884,0.17], guard_chest:[0.677,0.373], guard_flank:[0.541,0.243], guard_temple:[0.626,0.358],
+  guard_low:[0.612,0.348], block_side:[0.887,0.166], block_high:[0.556,0.11], block_cross:[0.446,0.228],
+  block_low:[0.429,0.371], cover:[0.46,0.238]
+};
+var DEFAULT_PICOVALUE = {
+  guard_base:'yuko', guard_closed:'yuko', guard_chest:'yuko', guard_flank:'yuko', guard_temple:'yuko',
+  guard_low:'ippon', block_side:'yuko', block_high:'waza-ari', block_cross:'waza-ari', block_low:'yuko', cover:'ippon'
+};
+var DEFAULT_COUNTERVALUE = {
+  atk_jab:'yuko', atk_cross:'waza-ari', atk_combo:'yuko', kick_front:'yuko',
+  kick_mid:'yuko', kick_high:'ippon', knee:'yuko', kick_low:'yuko', sweep_low:'ippon'
+};
 var ZONES = [['','— sin elegir —'],['cabeza','Cabeza'],['torso','Torso'],
   ['costado_izq','Costado izquierdo'],['costado_der','Costado derecho'],['piernas','Piernas']];
-var DEFAULT_DEFEND = {}; // sin defaults -- lo decide el usuario, no adivinar como con las dianas de Ataque
+/* DEFAULT_DEFEND: también semilla de m_ao (antes vacío a propósito, para no
+   adivinar -- ahora sí hay una calibración real de la que partir). */
+var DEFAULT_DEFEND = {
+  guard_base:'', guard_closed:'', guard_chest:'costado_izq', guard_flank:'torso',
+  guard_temple:'costado_izq', guard_low:'costado_izq', block_side:'costado_izq', block_high:'cabeza',
+  block_cross:'torso', block_low:'torso', cover:'torso'
+};
 
-var LSKEY = 'rds_karate_dianas_v5';
-var LSKEY_OLD_V4 = 'rds_karate_dianas_v4';
-var LSKEY_OLD_V3 = 'rds_karate_dianas_v3';
-var LSKEY_OLD = 'rds_karate_dianas_v2';
-var saved = { pts:{}, counter:{}, value:{}, defend:{}, amago:{}, picoValue:{}, counterValue:{} };
-try {
-  var v5 = JSON.parse(localStorage.getItem(LSKEY) || 'null');
-  var v4 = v5 ? null : JSON.parse(localStorage.getItem(LSKEY_OLD_V4) || 'null');
-  var v3 = (v5 || v4) ? null : JSON.parse(localStorage.getItem(LSKEY_OLD_V3) || 'null');
-  if(v5){ saved = v5; }
-  else if(v4){ saved = v4; saved.picoValue = {}; saved.counterValue = {}; }
-  else if(v3){ saved = v3; saved.amago = {}; saved.picoValue = {}; saved.counterValue = {}; }
-  else {
-    var v2 = JSON.parse(localStorage.getItem(LSKEY_OLD) || '{}'); // migra solo los puntos de la version anterior
-    saved.pts = v2;
-  }
-  if(!saved.picoValue) saved.picoValue={};
-  if(!saved.counterValue) saved.counterValue={};
-} catch(e){}
-
-var MANIFEST = [{"name":"guard_base","w":168,"h":332},{"name":"atk_jab","w":168,"h":334},{"name":"atk_cross","w":185,"h":334},{"name":"atk_combo","w":179,"h":332},{"name":"atk_elbow","w":181,"h":349},{"name":"kick_front","w":168,"h":353},{"name":"kick_mid","w":170,"h":348},{"name":"kick_high","w":179,"h":354},{"name":"knee","w":140,"h":340},{"name":"kick_low","w":276,"h":348},{"name":"sweep_low","w":359,"h":259},{"name":"guard_closed","w":168,"h":333},{"name":"guard_chest","w":167,"h":335},{"name":"guard_flank","w":179,"h":334},{"name":"guard_temple","w":179,"h":333},{"name":"block_side","w":180,"h":349},{"name":"guard_low","w":178,"h":340},{"name":"block_high","w":179,"h":351},{"name":"block_cross","w":176,"h":348},{"name":"block_low","w":125,"h":340},{"name":"cover","w":157,"h":345},{"name":"evade_back","w":186,"h":243}];
+/* v6: 4 personajes (m_aka/m_ao/f_aka/f_ao), cada uno con su propia carpeta de
+   assets, sus propias dimensiones reales (medidas al recortar los sprites de
+   Gemini) y su propia calibración guardada/exportada por separado. */
+var SPR_BY_CHAR = {
+"m_aka":{ "atk_jab":{"w":226,"h":351}, "atk_cross":{"w":243,"h":346}, "atk_elbow":{"w":226,"h":350},
+  "atk_combo":{"w":247,"h":352}, "kick_front":{"w":239,"h":352}, "kick_mid":{"w":256,"h":354},
+  "kick_high":{"w":260,"h":368}, "kick_low":{"w":254,"h":354}, "knee":{"w":169,"h":367},
+  "sweep_low":{"w":264,"h":322}, "saludo":{"w":143,"h":356},
+  "guard_base":{"w":191,"h":356}, "guard_closed":{"w":191,"h":356}, "guard_temple":{"w":193,"h":356},
+  "guard_flank":{"w":193,"h":356}, "guard_chest":{"w":192,"h":356}, "guard_low":{"w":192,"h":356},
+  "block_side":{"w":211,"h":359}, "block_high":{"w":194,"h":368}, "block_cross":{"w":195,"h":359},
+  "block_low":{"w":196,"h":359}, "cover":{"w":198,"h":348}, "evade_back":{"w":222,"h":356} },
+"m_ao":{ "atk_jab":{"w":226,"h":351}, "atk_cross":{"w":243,"h":345}, "atk_elbow":{"w":226,"h":350},
+  "atk_combo":{"w":247,"h":352}, "kick_front":{"w":240,"h":352}, "kick_mid":{"w":256,"h":354},
+  "kick_high":{"w":260,"h":368}, "kick_low":{"w":255,"h":354}, "knee":{"w":169,"h":367},
+  "sweep_low":{"w":264,"h":322}, "saludo":{"w":141,"h":351},
+  "guard_base":{"w":189,"h":351}, "guard_closed":{"w":189,"h":351}, "guard_temple":{"w":189,"h":351},
+  "guard_flank":{"w":190,"h":351}, "guard_chest":{"w":189,"h":351}, "guard_low":{"w":189,"h":351},
+  "block_side":{"w":207,"h":350}, "block_high":{"w":191,"h":359}, "block_cross":{"w":191,"h":350},
+  "block_low":{"w":192,"h":350}, "cover":{"w":194,"h":341}, "evade_back":{"w":207,"h":351} },
+"f_aka":{ "atk_jab":{"w":222,"h":355}, "atk_cross":{"w":241,"h":346}, "atk_elbow":{"w":224,"h":355},
+  "atk_combo":{"w":264,"h":364}, "kick_front":{"w":263,"h":364}, "kick_mid":{"w":252,"h":351},
+  "kick_high":{"w":255,"h":361}, "kick_low":{"w":249,"h":351}, "knee":{"w":224,"h":364},
+  "sweep_low":{"w":263,"h":364}, "saludo":{"w":135,"h":365},
+  "guard_base":{"w":190,"h":356}, "guard_closed":{"w":190,"h":356}, "guard_temple":{"w":190,"h":355},
+  "guard_flank":{"w":207,"h":363}, "guard_chest":{"w":215,"h":360}, "guard_low":{"w":204,"h":357},
+  "block_side":{"w":216,"h":362}, "block_high":{"w":197,"h":364}, "block_cross":{"w":199,"h":370},
+  "block_low":{"w":194,"h":366}, "cover":{"w":197,"h":365}, "evade_back":{"w":220,"h":364} },
+"f_ao":{ "atk_jab":{"w":225,"h":358}, "atk_cross":{"w":264,"h":364}, "atk_elbow":{"w":255,"h":364},
+  "atk_combo":{"w":256,"h":364}, "kick_front":{"w":264,"h":364}, "kick_mid":{"w":252,"h":351},
+  "kick_high":{"w":264,"h":364}, "kick_low":{"w":260,"h":364}, "knee":{"w":226,"h":364},
+  "sweep_low":{"w":252,"h":364}, "saludo":{"w":135,"h":365},
+  "guard_base":{"w":190,"h":356}, "guard_closed":{"w":190,"h":356}, "guard_temple":{"w":190,"h":355},
+  "guard_flank":{"w":207,"h":363}, "guard_chest":{"w":216,"h":359}, "guard_low":{"w":203,"h":358},
+  "block_side":{"w":216,"h":362}, "block_high":{"w":197,"h":364}, "block_cross":{"w":199,"h":370},
+  "block_low":{"w":194,"h":366}, "cover":{"w":196,"h":365}, "evade_back":{"w":220,"h":364} }
+};
+var CHARS = ['m_aka','m_ao','f_aka','f_ao'];
+var curChar = CHARS[0];
 var META = {};
 var pts = {}, counterPts = {}, values = {}, defends = {}, amagoPts = {}, picoValues = {}, counterValues = {};
-MANIFEST.forEach(function(s){ META[s.name] = s; });
-build();
+var saved = { pts:{}, counter:{}, value:{}, defend:{}, amago:{}, picoValue:{}, counterValue:{} };
+
+function lskey(ch){ return 'rds_karate_dianas_v6_'+ch; }
+function loadSaved(ch){
+  saved = { pts:{}, counter:{}, value:{}, defend:{}, amago:{}, picoValue:{}, counterValue:{} };
+  try {
+    var v6 = JSON.parse(localStorage.getItem(lskey(ch)) || 'null');
+    if(v6){ saved = v6; }
+    if(!saved.picoValue) saved.picoValue={};
+    if(!saved.counterValue) saved.counterValue={};
+  } catch(e){}
+}
+function switchChar(ch){
+  curChar = ch;
+  META = SPR_BY_CHAR[ch];
+  loadSaved(ch);
+  pts = {}; counterPts = {}; values = {}; defends = {}; amagoPts = {}; picoValues = {}; counterValues = {};
+  document.getElementById('list').innerHTML = '';
+  var bs = document.getElementById('charbar').querySelectorAll('button');
+  for(var i=0;i<bs.length;i++){ bs[i].classList.toggle('sel', bs[i].getAttribute('data-v')===ch); }
+  build();
+}
+document.getElementById('charbar').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if(!b) return;
+  switchChar(b.getAttribute('data-v'));
+});
+switchChar(curChar);
 
 /* normaliza a null o array-de-puntos [[x,y],...], acepte formato viejo [x,y] o nuevo [[x,y],[x2,y2]] */
 function normPts(raw){
@@ -157,10 +241,10 @@ function build(){
       values[name] = (saved.value&&saved.value[name]) || DEFAULT_VALUE[name] || 'yuko';
       defends[name] = (saved.defend&&saved.defend[name]!=null) ? saved.defend[name] : (DEFAULT_DEFEND[name]||'');
       var cpRaw = saved.counter && Object.prototype.hasOwnProperty.call(saved.counter,name) ? saved.counter[name] : undefined;
-      counterPts[name] = cpRaw!==undefined ? cpRaw : null;
+      counterPts[name] = cpRaw!==undefined ? cpRaw : (DEFAULT_COUNTER[name]!==undefined ? DEFAULT_COUNTER[name] : null);
       var lastCounter = counterPts[name] || [0.5,0.5];
-      picoValues[name] = (saved.picoValue && saved.picoValue[name]) || 'yuko';
-      counterValues[name] = (saved.counterValue && saved.counterValue[name]) || 'yuko';
+      picoValues[name] = (saved.picoValue && saved.picoValue[name]) || DEFAULT_PICOVALUE[name] || 'yuko';
+      counterValues[name] = (saved.counterValue && saved.counterValue[name]) || DEFAULT_COUNTERVALUE[name] || 'yuko';
 
       var card = document.createElement('div'); card.className='card';
       var col = document.createElement('div');
@@ -212,7 +296,7 @@ function build(){
       var w = STAGE_H * (meta.w/meta.h);
       var stage = document.createElement('div'); stage.className='stage';
       stage.style.width = w+'px'; stage.style.height = STAGE_H+'px';
-      var img = document.createElement('img'); img.src = 'assets/'+name+'.png';
+      var img = document.createElement('img'); img.src = 'assets/'+curChar+'/'+name+'.png';
       var badge = document.createElement('div'); badge.className='guard-badge'; badge.textContent='Posición de guardia';
       stage.appendChild(img); stage.appendChild(badge);
 
@@ -346,7 +430,7 @@ function buildAmagoCard(name){
   var baseMeta = META['guard_base'], targetMeta = META[name];
   if(!baseMeta || !targetMeta) return;
   var raw = (saved.amago && saved.amago[name]) || null;
-  amagoPts[name] = raw ? raw.slice() : [0.5, 0.5];
+  amagoPts[name] = raw ? raw.slice() : (DEFAULT_AMAGO[name] ? DEFAULT_AMAGO[name].slice() : [0.5, 0.5]);
 
   var card = document.createElement('div'); card.className='card';
   var col = document.createElement('div');
@@ -357,13 +441,13 @@ function buildAmagoCard(name){
   var baseW = STAGE_H * (baseMeta.w/baseMeta.h);
   var baseStage = document.createElement('div'); baseStage.className='stage';
   baseStage.style.width = baseW+'px'; baseStage.style.height = STAGE_H+'px';
-  var baseImg = document.createElement('img'); baseImg.src = 'assets/guard_base.png';
+  var baseImg = document.createElement('img'); baseImg.src = 'assets/'+curChar+'/guard_base.png';
   baseStage.appendChild(baseImg);
 
   var refH = 160, refW = refH * (targetMeta.w/targetMeta.h);
   var refStage = document.createElement('div'); refStage.className='stage';
   refStage.style.width = refW+'px'; refStage.style.height = refH+'px'; refStage.style.alignSelf='flex-end';
-  var refImg = document.createElement('img'); refImg.src = 'assets/'+name+'.png';
+  var refImg = document.createElement('img'); refImg.src = 'assets/'+curChar+'/'+name+'.png';
   var refLbl = document.createElement('div'); refLbl.className='ref-lbl'; refLbl.textContent='→ '+name;
   refStage.appendChild(refImg); refStage.appendChild(refLbl);
 
@@ -398,7 +482,7 @@ function buildAmagoCard(name){
 }
 
 function persist(){
-  try { localStorage.setItem(LSKEY, JSON.stringify({pts:pts, counter:counterPts, value:values, defend:defends, amago:amagoPts, picoValue:picoValues, counterValue:counterValues})); } catch(e){}
+  try { localStorage.setItem(lskey(curChar), JSON.stringify({pts:pts, counter:counterPts, value:values, defend:defends, amago:amagoPts, picoValue:picoValues, counterValue:counterValues})); } catch(e){}
   updProgress();
 }
 function updProgress(){
@@ -434,7 +518,7 @@ function exportAll(){
   guardNames.forEach(function(k){ defs[k] = defends[k]; picoVals[k] = picoValues[k]; });
   var amago = {};
   Object.keys(amagoPts).forEach(function(k){ amago[k] = [ +amagoPts[k][0].toFixed(3), +amagoPts[k][1].toFixed(3) ]; });
-  var o = { hits:hits, values:vals, defends:defs, counters:counters, amago:amago, picoValues:picoVals, counterValues:counterVals };
+  var o = { char:curChar, hits:hits, values:vals, defends:defs, counters:counters, amago:amago, picoValues:picoVals, counterValues:counterVals };
   document.getElementById('out').value = JSON.stringify(o);
 }
 function copyOut(){
