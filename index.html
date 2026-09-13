@@ -20,7 +20,14 @@ if('serviceWorker' in navigator){
     swReloaded=true; window.location.reload();
   });
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(function(reg){
+    /* La URL de sw.js lleva ?v=<app-ver> para que cada versión sea una petición
+       de red distinta -- sin esto, aunque el navegador no cachee el propio
+       Service Worker (updateViaCache:'none'), un CDN intermedio (GitHub Pages)
+       puede servir durante un rato una copia vieja de sw.js con la MISMA URL
+       de siempre, y la app tarda en enterarse de que hay versión nueva. */
+    var verEl = document.querySelector('.app-ver');
+    var swUrl = 'sw.js?v=' + encodeURIComponent(verEl ? verEl.textContent.trim() : Date.now());
+    navigator.serviceWorker.register(swUrl, {updateViaCache:'none'}).then(function(reg){
       swReg=reg;
       reg.update();
       if(reg.waiting && navigator.serviceWorker.controller){ reg.waiting.postMessage({action:'skipWaiting'}); }
@@ -397,7 +404,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v23</div>
+    <div class="app-ver">v24</div>
     </div>
 
   </main>
