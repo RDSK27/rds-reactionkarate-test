@@ -1,5 +1,5 @@
 /* RDS Plantilla - Service Worker */
-var CACHE = 'reactionkarate-v50';
+var CACHE = 'reactionkarate-v51';
 var ASSETS = [
   './',
   './index.html',
@@ -10,16 +10,18 @@ var ASSETS = [
 ];
 
 self.addEventListener('install', function(e){
+  /* Activar la versión nueva EN CUANTO termine de instalarse, sin esperar
+     a que la página mande un mensaje pidiéndolo (2026-09-14 -- el usuario
+     reportó que tardaba varios cierres/aperturas en actualizarse). Antes
+     dependía de un mensaje de ida y vuelta (ver 'updatefound' en index.html)
+     que añadía un paso más que podía retrasarse o no llegar a tiempo. */
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE).then(function(cache){
       // {cache:'reload'} evita que el precache use copias viejas del HTTP cache
       return cache.addAll(ASSETS.map(function(u){ return new Request(u, {cache:'reload'}); }));
     })
   );
-});
-
-self.addEventListener('message', function(e){
-  if(e.data && e.data.action === 'skipWaiting'){ self.skipWaiting(); }
 });
 
 self.addEventListener('activate', function(e){

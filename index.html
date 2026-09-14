@@ -30,16 +30,6 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register(swUrl, {updateViaCache:'none'}).then(function(reg){
       swReg=reg;
       reg.update();
-      if(reg.waiting && navigator.serviceWorker.controller){ reg.waiting.postMessage({action:'skipWaiting'}); }
-      reg.addEventListener('updatefound', function(){
-        var nw=reg.installing;
-        if(!nw) return;
-        nw.addEventListener('statechange', function(){
-          if(nw.state==='installed' && navigator.serviceWorker.controller){
-            nw.postMessage({action:'skipWaiting'});
-          }
-        });
-      });
     }).catch(function(){});
   });
   document.addEventListener('visibilitychange', function(){
@@ -439,7 +429,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v50</div>
+    <div class="app-ver">v51</div>
     </div>
 
   </main>
