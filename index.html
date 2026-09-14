@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v54</div>
+    <div class="app-ver">v55</div>
     </div>
 
   </main>
@@ -1413,6 +1413,21 @@ function applyCharHits(){
 }
 applyCharHits();
 
+/* Compensación de retardo de pantalla, igual que en rds-reaction-test
+   (mismo valor 30ms, misma técnica: performance.now() mide desde que el
+   JS pinta el estímulo, no desde que el píxel es visible de verdad -- hay
+   un margen de render/pintado que no es reflejo del jugador). Se resta
+   UNA sola vez, al calcular el dt bruto de cada toque (cPointerDown y el
+   pointerdown global de Defensa/Ataque, únicos dos sitios donde se mide),
+   así que se aplica automáticamente a TODOS los umbrales de la app sin
+   tocarlos uno a uno: kWindow() (Defensa/Ataque) y cWinDefend/cWinPico/
+   cWinParar/cDefendThreshold (Combate) siguen con sus mismos valores,
+   pero ahora comparan contra el dt YA corregido. 2026-09-14, pedido
+   expreso ("que se mida de la misma manera" que reaction-test). El
+   ranking de Defensa/Ataque queda con marcas antiguas no comparables
+   1:1 con las nuevas -- asumido a propósito, a diferencia de processing
+   (ver rds-processing-test, mismo día: ahí se decidió NO aplicarlo). */
+var DISPLAY_CORRECTION = 30;
 var K_WINDOW_CONT = 525; // ms para llegar a defender/atacar en "Seguido" (+50ms pedido 2026-09-13)
 var K_WINDOW_PAUS = 550; // ms para llegar a defender/atacar en "Espera" (+50ms pedido 2026-09-13)
 var K_ATK_EXTRA = 25; // Ataque 25ms más difícil que Defensa (pedido 2026-09-13)
@@ -2076,7 +2091,7 @@ function cAnswerPlanGuess(guess){
 function cPointerDown(ev){
   if(!C.active) return;
   if(C.state==='amago_aim') return cResolveAmagoAim(ev);
-  var dt=performance.now()-C.t0;
+  var dt=Math.max(1, performance.now()-C.t0-DISPLAY_CORRECTION);
   var r=kRing.getBoundingClientRect();
   var cx=r.left+r.width/2, cy=r.top+r.height/2;
   var d=Math.hypot(ev.clientX-cx, ev.clientY-cy);
@@ -2104,7 +2119,7 @@ document.addEventListener('pointerdown', function(ev){
     return;
   }
   if(K.state!=='go') return;
-  var dt=performance.now()-K.t0;
+  var dt=Math.max(1, performance.now()-K.t0-DISPLAY_CORRECTION);
   var r=kRing.getBoundingClientRect();
   var cx=r.left+r.width/2, cy=r.top+r.height/2;
   var d=Math.hypot(ev.clientX-cx, ev.clientY-cy);
