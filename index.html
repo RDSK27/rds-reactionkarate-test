@@ -420,7 +420,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v42</div>
+    <div class="app-ver">v43</div>
     </div>
 
   </main>
@@ -1696,6 +1696,7 @@ function cGuardChangeOnly(){
   C.mirror = Math.random()<0.5;
   var pose = C_GUARD_POSES[Math.floor(Math.random()*C_GUARD_POSES.length)];
   cShowPose(pose, null, C.mirror);
+  sndWhooshMove();
   kRing.className='k-ring';
   C.timer=setTimeout(function(){
     if(!C.active || C.state!=='parado') return;
@@ -1723,6 +1724,7 @@ function cBeginFeintAttack(){
     K.tech = { s:realName, hx:K_HITS[realName][0], hy:K_HITS[realName][1], name:K_NAMES[realName], sc:(K_SC[realName]||1), winBonus:0, isFeintReal:true };
     C.pending = K.tech;
     cShowPose(K.tech.s, K.tech, C.mirror);
+    sndKiai(S.gender);
     kRing.className='k-ring on';
     C.t0=performance.now();
     C.timer=setTimeout(function(){ cResolveAttack(null); }, cDefendThreshold(K.tech)+K_GRACE);
@@ -1740,6 +1742,7 @@ function cBeginAttack(){
   C.pending = K.tech;
   C.mirror = Math.random()<0.5;
   cShowPose(K.tech.s, K.tech, C.mirror);
+  sndKiai(S.gender);
   kRing.className='k-ring on';
   C.t0=performance.now();
   var win = cDefendThreshold(K.tech)+K_GRACE;
@@ -1794,7 +1797,6 @@ function cNearestAmagoPose(hxF, hyF){
 }
 function cResolveAmagoAim(ev){
   if(C.state!=='amago_aim') return;
-  sndWhooshAmago(); // el sonido va al tocar al karateka, no al pulsar el botón "Amago"
   var r = kKata.getBoundingClientRect();
   var hxF = (ev.clientX - r.left) / r.width;
   var hyF = (ev.clientY - r.top) / r.height;
