@@ -251,10 +251,14 @@ if('serviceWorker' in navigator){
   /* ---- Ejercicio Reaction Karate ---- */
   .segment button:disabled{ color:#6b6b6b; cursor:not-allowed; }
   #game{ background:#fff; }
-  .k-hud{ display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:#111; color:#fff;
-    font-weight:900; letter-spacing:.05em; font-size:.72rem; text-transform:uppercase; flex-shrink:0; gap:4px; }
-  .k-hud span{ white-space:nowrap; }
-  #kHudDef{ color:#5ad17a; } #kHudPt{ color:#ef6a58; } #kHudRT{ color:#f2c94c; }
+  /* Barra de resultados de Defensa/Ataque, idéntica a la de Combate
+     (mismas cajas .c-score roja/azul + centro .c-timer) -- 2026-09-14.
+     En el centro, en vez del reloj de Combate, van dos lecturas de
+     velocidad de reacción (última y media) sin etiqueta propia, solo
+     coloreadas por umbral -- ver kRtColor()/kUpdReaction(). */
+  .k-hud-center{ display:flex; align-items:center; gap:6px; }
+  .k-hud-sep{ opacity:.5; }
+  .k-rt-good{ color:#5ad17a; } .k-rt-mid{ color:#f2c94c; } .k-rt-bad{ color:#ef6a58; }
   .k-stage-wrap{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px;
     background:linear-gradient(180deg,#dfe3e6,#c4c8cb); }
   .k-stage{ position:relative; width:100%; max-width:330px; aspect-ratio:3/4; overflow:hidden;
@@ -414,7 +418,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v45</div>
+    <div class="app-ver">v46</div>
     </div>
 
   </main>
@@ -458,11 +462,12 @@ if('serviceWorker' in navigator){
     <!--  Ahora es un stub: genera una puntuacion de prueba y pasa a        -->
     <!--  Resultado, para poder probar Guardar / Ranking / Firebase.        -->
     <!-- ================================================================= -->
-    <div class="k-hud" id="kHudNormal">
-      <span id="kHudRep">0 / 0</span>
-      <span id="kHudDef">Def 0</span>
-      <span id="kHudPt">Pts 0</span>
-      <span id="kHudRT">RT --</span>
+    <div class="c-hud" id="kHudNormal">
+      <div class="c-score c-score-aka" id="kHudDef">0</div>
+      <div class="c-timer k-hud-center">
+        <span id="kHudActual">Actual</span><span class="k-hud-sep">/</span><span id="kHudMedia">Media</span>
+      </div>
+      <div class="c-score c-score-ao" id="kHudPt">0</div>
     </div>
     <div class="c-hud" id="cHud" style="display:none">
       <div class="c-score c-score-aka" id="cScoreAka">0</div>
@@ -1388,7 +1393,7 @@ function kStart(){
   K.pace  = selVal('seg3')||'cont';
   K.rep=0; K.def=0; K.pt=0; K.state='idle';
   S.times=[]; S.kDef=0; S.kTotal=K.total;
-  kUpdHud(); kUpdRT(null);
+  kUpdHud(); kUpdReaction();
   kRing.className='k-ring'; kMark.className='k-mark'; $('kFlag').className='k-flag';
   kSetStatus('');
   /* Entrada del ejercicio (Ataque/Defensa): guardia -> saludo -> guardia +
@@ -1411,14 +1416,44 @@ function kStart(){
   }, 500);
 }
 function kUpdHud(){
-  var atk = kMode()==='atk';
-  $('kHudRep').textContent = K.rep+' / '+K.total;
-  $('kHudDef').textContent = (atk?'Acx ':'Def ')+K.def;
-  $('kHudPt').textContent  = (atk?'Fallos ':'Pts ')+K.pt;
+  $('kHudDef').textContent = K.def;
+  $('kHudPt').textContent  = K.pt;
 }
-function kUpdRT(ms){
-  var el=$('kHudRT'); if(!el) return;
-  el.textContent = 'RT ' + (ms!=null ? Math.round(ms)+'ms' : '--');
+function kRtColor(ms){
+  if(ms<425) return 'k-rt-good';
+  if(ms<=500) return 'k-rt-mid';
+  return 'k-rt-bad';
+}
+/* Actual/Media de velocidad de reacción, en el centro de la barra (donde
+   Combate pone el reloj) -- 2026-09-14, pedido expreso. Al arrancar el
+   ejercicio (kUpdReaction() sin argumento) se enseñan como ETIQUETA
+   ("Actual"/"Media"); desde el primer intento ya no vuelve a aparecer la
+   etiqueta, solo el dato real o "--". Coloreadas por umbral: <425ms bien
+   (verde), 425-500 medio (amarillo), >500 mal (rojo) -- ver kRtColor().
+   Media = promedio de S.times (solo aciertos, igual que en finish()). */
+function kUpdReaction(ms){
+  var actualEl=$('kHudActual'), mediaEl=$('kHudMedia');
+  if(!actualEl || !mediaEl) return;
+  if(ms===undefined){
+    actualEl.textContent='Actual'; actualEl.className='';
+    mediaEl.textContent='Media'; mediaEl.className='';
+    return;
+  }
+  if(ms!=null){
+    actualEl.textContent=Math.round(ms)+'ms';
+    actualEl.className=kRtColor(ms);
+  } else {
+    actualEl.textContent='--';
+    actualEl.className='';
+  }
+  if(S.times && S.times.length){
+    var avg = S.times.reduce(function(a,b){ return a+b; },0)/S.times.length;
+    mediaEl.textContent=Math.round(avg)+'ms';
+    mediaEl.className=kRtColor(avg);
+  } else {
+    mediaEl.textContent='--';
+    mediaEl.className='';
+  }
 }
 var kFlagTimer=0;
 /* Bandera arbitral (Ataque/Defensa): acierto = mi color (el contrario del
@@ -1489,7 +1524,6 @@ function kResolve(tap){
   if(K.state!=='go') return;
   clearTimeout(K.timer);
   K.state='done';
-  var atk = kMode()==='atk';
   var ok = tap && tap.onTarget && tap.dt<=kWindow();
   if(ok){
     K.def++; S.kDef=K.def;
@@ -1501,9 +1535,9 @@ function kResolve(tap){
   }
   if(ok && tap){ sndPunch(); } // solo si hubo un toque de verdad que conectó
   kShowFlag(ok);
-  kUpdRT(tap && tap.dt!=null ? tap.dt : null);
-  $('kHudDef').textContent=(atk?'Acx ':'Def ')+K.def;
-  $('kHudPt').textContent =(atk?'Fallos ':'Pts ')+K.pt;
+  kUpdReaction(tap && tap.dt!=null ? tap.dt : null);
+  $('kHudDef').textContent = K.def;
+  $('kHudPt').textContent  = K.pt;
   K.timer=setTimeout(kNext, K.pace==='paus' ? 1100 : 600);
 }
 function kFinish(){
@@ -1920,8 +1954,8 @@ document.addEventListener('pointerdown', function(ev){
     K.pt++;
     kRing.className='k-ring no';
     kShowFlag(false);
-    kUpdRT(null);
-    $('kHudPt').textContent=(kMode()==='atk'?'Fallos ':'Pts ')+K.pt;
+    kUpdReaction(null);
+    $('kHudPt').textContent = K.pt;
     K.timer=setTimeout(kNext, K.pace==='paus' ? 1000 : 600);
     return;
   }
