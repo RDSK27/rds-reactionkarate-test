@@ -436,7 +436,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v48</div>
+    <div class="app-ver">v49</div>
     </div>
 
   </main>
@@ -1235,9 +1235,9 @@ function cWinParar(){ return C_WIN_PARAR_BASE; }
    Ajuste posterior del mismo día: cambios de guardia x2 en los 3 planes,
    y amagos rival +1 sobre el número de cada plan. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:10, guardPerMin:4, feintPerMin:4, defendStart:625 },
-  b: { label:'Plan B · Defensa',     atkPerMin:5, guardPerMin:8, feintPerMin:3, defendStart:575, amagoStart:400 },
-  c: { label:'Plan C · Provocación', atkPerMin:7, guardPerMin:4, feintPerMin:6 }
+  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:5, feintPerMin:5, defendStart:625 },
+  b: { label:'Plan B · Defensa',     atkPerMin:7, guardPerMin:10, feintPerMin:5, defendStart:575, amagoStart:400 },
+  c: { label:'Plan C · Provocación', atkPerMin:11, guardPerMin:7, feintPerMin:7 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 function cWinDefend(){
