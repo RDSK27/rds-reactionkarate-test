@@ -319,12 +319,6 @@ if('serviceWorker' in navigator){
   .c-amago-pip{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:.68rem; font-weight:900; background:rgba(255,255,255,.22); color:#fff; }
   .c-amago-pip.dim{ background:rgba(255,255,255,.08); color:rgba(255,255,255,.4); }
-  /* Aviso de bonus wazari/ippon (diferencia de marcador) armado y pendiente
-     de usar en el próximo acierto del jugador -- ver cCheckBonusTrigger. */
-  .c-bonus-badge{ align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
-    font-size:.72rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:#1a1200; }
-  .c-bonus-badge.waza{ background:#e0b23a; }
-  .c-bonus-badge.ippon{ background:#f2c94c; box-shadow:0 0 0 2px rgba(255,255,255,.5); }
 
   /* Pregunta "¿qué plan usó el rival?" al terminar un combate con Táctica. */
   .c-plan-quiz{ position:absolute; inset:0; z-index:20; background:rgba(17,17,17,.94);
@@ -420,7 +414,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v44</div>
+    <div class="app-ver">v45</div>
     </div>
 
   </main>
@@ -474,7 +468,6 @@ if('serviceWorker' in navigator){
       <div class="c-score c-score-aka" id="cScoreAka">0</div>
       <div class="c-timer" id="cTimer">1:00</div>
       <div class="c-score c-score-ao" id="cScoreAo">0</div>
-      <div class="c-bonus-badge" id="cBonusBadge" style="display:none"></div>
     </div>
     <div class="k-stage-wrap">
       <div class="k-stage" id="kStage">
@@ -1181,33 +1174,26 @@ var C_DEFENDS = {
    tocar para provocar cada postura de defensa -- calibrado en calibrar.html
    (sección "Amago"), POR PERSONAJE igual que A_HITS/K_HITS/C_COUNTERS. */
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
-/* Márgenes de Combate (2026-09-13; corregido el mismo día -- el usuario
-   había dicho 480/400 y luego rectificó a 500/300). Contraataque siempre
-   usa la penalización adaptativa por MARCADOR (cAdaptivePenalty). Defender
-   y amago tienen además su propio ajuste por RACHA cuando hay un Plan de
-   Táctica activo (ver PLAN_CONFIG/cWinDefend()/cWinPico() más abajo) --
-   sin Táctica (Libre), defender es fijo y amago usa la misma penalización
-   por marcador que contraataque. */
-var C_WIN_DEFEND = 500;     // ms para parar/defender el ataque real del rival (Libre / sin ajuste de plan)
-var C_WIN_PICO_BASE = 300;  // ms base para entrar al hueco tras un pique (Libre)
-var C_WIN_PARAR_BASE = 350; // ms base para contraatacar tras parar una técnica del rival
-var C_WIN_FEINT_DEFEND = 550; // ms para defender la técnica DEFINITIVA de un "amago rival" -- fijo, igual en los 3 planes
-function cAdaptivePenalty(){
-  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
-  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
-  var lead = playerScore - rivalScore;
-  return lead>2 ? (lead-2)*10 : 0;
-}
-function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
+/* Umbrales de Combate: TODOS fijos y sin ajuste adaptativo (2026-09-14,
+   pedido expreso "para ir probando bien" -- se anuló tanto la penalización
+   por marcador de cAdaptivePenalty como la racha por plan de
+   cAdjustPlanDefend/cAdjustPlanAmago, y se subieron todos +100ms respecto
+   a sus valores anteriores). Solo Combate -- Defensa/Ataque (kWindow) no
+   se tocan. */
+var C_WIN_DEFEND = 600;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
+var C_WIN_PICO_BASE = 400;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
+var C_WIN_PARAR_BASE = 450; // ms para contraatacar tras parar una técnica del rival
+var C_WIN_FEINT_DEFEND = 650; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
+function cWinParar(){ return C_WIN_PARAR_BASE; }
 
 /* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
    Libre = comportamiento de siempre (ataques espontáneos al azar, sin
    cambios de guardia ni amagos del rival, defender/amago con los valores
    de arriba). Con un Plan activo, el rival programa sus acciones según
    3 tasas por minuto (técnica real / cambio de guardia sin más / "amago
-   rival" — ver cScheduleNext()), y algunos planes hacen que el umbral de
-   defender o de amago vaya subiendo/bajando de 10 en 10 según el jugador
-   vaya acertando o fallando (racha), en vez de quedarse fijo.
+   rival" — ver cScheduleNext()). Planes A y B tienen además su propio
+   umbral fijo de defender (y B de amago) distinto del de Libre/Plan C --
+   ya NO suben/bajan por racha, ver nota de 2026-09-14 más arriba.
    NOTA: "cambios de guardia" del Plan C = 2/min, igual que el Plan A, pese
    a que el propio Plan C se describe como el que más juega con el cambio
    de guardia -- se probó primero con 3/min (interpolando "Medio" entre el
@@ -1215,38 +1201,27 @@ function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
    Ajuste posterior del mismo día: cambios de guardia x2 en los 3 planes,
    y amagos rival +1 sobre el número de cada plan. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:10, guardPerMin:4, feintPerMin:4, defendStart:525, defendStep:10 },
-  b: { label:'Plan B · Defensa',     atkPerMin:5, guardPerMin:8, feintPerMin:3, defendStart:475, defendStep:10, amagoStart:300, amagoStep:10 },
+  a: { label:'Plan A · Ataque',      atkPerMin:10, guardPerMin:4, feintPerMin:4, defendStart:625 },
+  b: { label:'Plan B · Defensa',     atkPerMin:5, guardPerMin:8, feintPerMin:3, defendStart:575, amagoStart:400 },
   c: { label:'Plan C · Provocación', atkPerMin:7, guardPerMin:4, feintPerMin:6 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 function cWinDefend(){
   var cfg=cPlanCfg();
-  return (cfg && cfg.defendStart!=null) ? C.planDefend : C_WIN_DEFEND;
+  return (cfg && cfg.defendStart!=null) ? cfg.defendStart : C_WIN_DEFEND;
 }
 /* Umbral fijo para defender sweep_low, igual en Libre y en los 3 planes
    de Táctica (2026-09-14, pedido explícito: "muy difícil de localizar").
    Sustituye por completo a cWinDefend()/C_WIN_FEINT_DEFEND para esa
    técnica -- no se suma a ninguno de los dos, los reemplaza. */
-var K_SWEEP_WINDOW = 600;
+var K_SWEEP_WINDOW = 700;
 function cDefendThreshold(tech){
   if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW;
   return (tech && tech.isFeintReal) ? C_WIN_FEINT_DEFEND : cWinDefend();
 }
-function cAdjustPlanDefend(success){
-  var cfg=cPlanCfg(); if(!cfg || cfg.defendStart==null) return;
-  C.planDefend += success ? -cfg.defendStep : cfg.defendStep;
-  C.planDefend = Math.min(cfg.defendStart, Math.max(150, C.planDefend)); // techo = inicio del plan; suelo de seguridad 150
-}
 function cWinPico(){
   var cfg=cPlanCfg();
-  if(cfg && cfg.amagoStart!=null) return C.planAmago;
-  return C_WIN_PICO_BASE - cAdaptivePenalty();
-}
-function cAdjustPlanAmago(success){
-  var cfg=cPlanCfg(); if(!cfg || cfg.amagoStart==null) return;
-  C.planAmago += success ? -cfg.amagoStep : cfg.amagoStep;
-  C.planAmago = Math.min(cfg.amagoStart, Math.max(100, C.planAmago));
+  return (cfg && cfg.amagoStart!=null) ? cfg.amagoStart : C_WIN_PICO_BASE;
 }
 /* Posturas de guardia/bloqueo que el rival puede enseñar como "cambio de
    guardia" puramente decorativo (Plan): sin aro, sin nada que tocar. */
@@ -1550,8 +1525,7 @@ function kFinish(){
    =================================================================== */
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
-          amagoUsed:0, amagoTotal:0, plan:null, planDefend:null, planAmago:null, guardUpTimer:0,
-          bonusWazaUsed:0, bonusIpponUsed:0, bonusPending:null };
+          amagoUsed:0, amagoTotal:0, plan:null, guardUpTimer:0 };
 var C_TERM = { yuko:'Yuko', 'waza-ari':'Waza-ari', ippon:'Ippon' };
 /* Valor (yuko/waza-ari/ippon) de un acierto de amago (por postura) o de
    contraataque tras parar (por técnica) -- calibrado en calibrar.html. */
@@ -1573,14 +1547,10 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
-  C.bonusWazaUsed=0; C.bonusIpponUsed=0; C.bonusPending=null; cUpdateBonusBadge();
   /* Con Táctica, el PLAN lo elige el juego al azar -- el jugador no lo ve,
      solo tiene que reconocerlo al final del combate (cAskPlanGuess). */
   var PLAN_KEYS = Object.keys(PLAN_CONFIG);
   C.plan = (S.cStrategy==='tactica') ? PLAN_KEYS[Math.floor(Math.random()*PLAN_KEYS.length)] : null;
-  var planCfg = C.plan && PLAN_CONFIG[C.plan];
-  C.planDefend = (planCfg && planCfg.defendStart!=null) ? planCfg.defendStart : null;
-  C.planAmago  = (planCfg && planCfg.amagoStart!=null)  ? planCfg.amagoStart  : null;
   K.pace='paus';
   cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
   $('cAmagoBtn').disabled=true;
@@ -1754,7 +1724,6 @@ function cResolveAttack(tap){
   var tech=C.pending;
   var threshold = cDefendThreshold(tech);
   var ok = tap && tap.onTarget && tap.dt<=threshold;
-  if(!tech.isFeintReal){ cAdjustPlanDefend(ok); } // el amago-rival no cuenta para la racha del plan
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
   var ctr = C_COUNTERS[tech.s];
@@ -1770,7 +1739,13 @@ function cResolveCounter(tap){
   clearTimeout(C.timer);
   var ok = tap && tap.onTarget && tap.dt<=cWinParar();
   C.state='done';
-  if(ok){ cAwardPoint('player', C_COUNTER_VALUES[C.pending.s]||'yuko'); }
+  if(ok){
+    // Parar un ataque de valor ippon y rematar el contraataque también vale
+    // ippon (2026-09-14, pedido expreso) -- NO aplica a waza-ari, que sigue
+    // con su valor de contraataque normal de C_COUNTER_VALUES.
+    var counterValue = (C_VALUES[C.pending.s]==='ippon') ? 'ippon' : (C_COUNTER_VALUES[C.pending.s]||'yuko');
+    cAwardPoint('player', counterValue);
+  }
   else { C.timer=setTimeout(cParado, 500); }
 }
 
@@ -1841,7 +1816,6 @@ function cResolvePico(tap){
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
-    cAdjustPlanAmago(ok);
     if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
@@ -1859,65 +1833,33 @@ function cShowFlagColor(color){
   var el=$('kFlag'); if(!el) return;
   clearTimeout(kFlagTimer);
   el.className='k-flag show '+color;
-  kFlagTimer=setTimeout(function(){ el.classList.remove('show'); }, 550);
+  kFlagTimer=setTimeout(function(){ el.classList.remove('show'); }, 2000);
 }
 var C_POINT_VALUES = { yuko:1, 'waza-ari':2, ippon:3 }; // el marcador SÍ pondera por valor (corregido 2026-09-13)
-/* ---- Bonus wazari/ippon por diferencia de marcador (2026-09-14) ----
-   Cuando la ventaja del jugador llega exactamente a 3 puntos se arma un
-   wazari (máx. 2 por combate) y a 4 puntos un ippon (máx. 1 por combate):
-   el siguiente acierto del jugador (pique o contraataque) sube de valor a
-   ese resultado si el valor natural de la técnica era menor. Se comprueba
-   en cada cambio de marcador (a favor o en contra), y un bonus ya armado
-   no se rearma ni se degrada mientras siga pendiente de usar. Libre
-   también tiene este bonus -- solo el ritmo de ataques reales (arriba en
-   PLAN_CONFIG) se deja intacto en Libre, por pedido expreso del usuario. */
-function cUpdateBonusBadge(){
-  var el = $('cBonusBadge'); if(!el) return;
-  if(!C.bonusPending){ el.style.display='none'; return; }
-  el.textContent = '★ '+C_TERM[C.bonusPending]+' disponible';
-  el.className = 'c-bonus-badge '+(C.bonusPending==='ippon'?'ippon':'waza');
-  el.style.display='flex';
-}
-function cCheckBonusTrigger(){
-  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
-  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
-  var diff = playerScore - rivalScore;
-  var curRank = C.bonusPending ? C_POINT_VALUES[C.bonusPending] : 0;
-  if(diff===4 && C.bonusIpponUsed<1 && curRank<C_POINT_VALUES.ippon){
-    C.bonusIpponUsed++; C.bonusPending='ippon';
-  } else if(diff===3 && C.bonusWazaUsed<2 && curRank<C_POINT_VALUES['waza-ari']){
-    C.bonusWazaUsed++; C.bonusPending='waza-ari';
-  }
-  cUpdateBonusBadge();
-}
 function cAwardPoint(side, value){
-  if(side==='player' && C.bonusPending){
-    if(C_POINT_VALUES[C.bonusPending] > (C_POINT_VALUES[value]||1)) value = C.bonusPending;
-    C.bonusPending=null; cUpdateBonusBadge();
-  }
   cPauseTimer();
   sndWhistle(); // marca que el combate se para tras la técnica, antes de anunciar el punto
   var color = cActorColor(side);
   var pts = C_POINT_VALUES[value]||1;
   if(color==='aka') C.scoreAka+=pts; else C.scoreAo+=pts;
   cUpdateScore();
-  cCheckBonusTrigger();
   kRing.className='k-ring'; kMark.className='k-mark';
   cShowFlagColor(color);
-  cShowPose('saludo', null, C.mirror); // el rival saluda mientras se anuncia el punto
   kSetStatus((C_TERM[value]||value)+' de '+(color==='aka'?'Aka':'Ao'), color==='aka'?'point':'pointao');
   var diff = Math.abs(C.scoreAka - C.scoreAo);
   if(diff>=8){ C.timer=setTimeout(function(){ cEndMatch('diff'); }, 1400); return; }
+  /* Combate parado 2s tras el punto (2026-09-14, pedido expreso): la
+     bandera se ve los 2s enteros (cShowFlagColor), el rival saluda solo
+     durante el 2º segundo, y al llegar a los 2s silbato + reanuda
+     directamente -- sin el "¡Hajime!" intermedio que había antes. */
   C.timer=setTimeout(function(){
-    kSetStatus('');
-    cShowPose('guard_base', null, C.mirror);
-    kSetStatus('¡Hajime!','hajime');
-    sndWhistle();
+    cShowPose('saludo', null, C.mirror);
     C.timer=setTimeout(function(){
       kSetStatus('');
+      sndWhistle();
       if(C.active){ C.paused=false; cParado(); }
-    }, 900);
-  }, 1600);
+    }, 1000);
+  }, 1000);
 }
 var PLAN_LABELS = { a:'Plan A', b:'Plan B', c:'Plan C' };
 function cEndMatch(){
