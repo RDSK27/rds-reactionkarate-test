@@ -420,7 +420,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v41</div>
+    <div class="app-ver">v42</div>
     </div>
 
   </main>
@@ -1224,6 +1224,15 @@ function cWinDefend(){
   var cfg=cPlanCfg();
   return (cfg && cfg.defendStart!=null) ? C.planDefend : C_WIN_DEFEND;
 }
+/* Umbral fijo para defender sweep_low, igual en Libre y en los 3 planes
+   de Táctica (2026-09-14, pedido explícito: "muy difícil de localizar").
+   Sustituye por completo a cWinDefend()/C_WIN_FEINT_DEFEND para esa
+   técnica -- no se suma a ninguno de los dos, los reemplaza. */
+var K_SWEEP_WINDOW = 600;
+function cDefendThreshold(tech){
+  if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW;
+  return (tech && tech.isFeintReal) ? C_WIN_FEINT_DEFEND : cWinDefend();
+}
 function cAdjustPlanDefend(success){
   var cfg=cPlanCfg(); if(!cfg || cfg.defendStart==null) return;
   C.planDefend += success ? -cfg.defendStep : cfg.defendStep;
@@ -1273,7 +1282,7 @@ var K_POOL = ['atk_jab','atk_cross','atk_combo','kick_front','kick_mid','kick_hi
    aplicar encima un 25% más sacaba al karateca del cuadro por arriba y por
    los lados (visto 2026-09-13: top llegaba a -70px con SH=434). Sin boost. */
 var K_SC   = {};
-var K_WINBONUS = { kick_low:50, sweep_low:100 }; // ms extra de margen para técnicas más difíciles de ver venir
+var K_WINBONUS = { kick_low:50 }; // ms extra de margen para técnicas más difíciles de ver venir (sweep_low tiene su propio umbral fijo, ver K_SWEEP_WINDOW)
 var K_TECHS; /* se construye en applyCharHits(), depende de K_HITS del personaje actual */
 
 /* ---- Dianas por personaje (calibradas en calibrar.html, una vez por cada
@@ -1342,6 +1351,7 @@ var K_WINDOW_PAUS = 550; // ms para llegar a defender/atacar en "Espera" (+50ms 
 var K_ATK_EXTRA = 25; // Ataque 25ms más difícil que Defensa (pedido 2026-09-13)
 var K_GRACE  = 320;   // margen antes del punto automático
 function kWindow(){
+  if(K.tech && K.tech.s==='sweep_low') return K_SWEEP_WINDOW;
   var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
   if(kMode()==='atk'){ base -= K_ATK_EXTRA; }
   return base + (K.tech && K.tech.winBonus || 0);
@@ -1715,7 +1725,7 @@ function cBeginFeintAttack(){
     cShowPose(K.tech.s, K.tech, C.mirror);
     kRing.className='k-ring on';
     C.t0=performance.now();
-    C.timer=setTimeout(function(){ cResolveAttack(null); }, C_WIN_FEINT_DEFEND+K_GRACE);
+    C.timer=setTimeout(function(){ cResolveAttack(null); }, cDefendThreshold(K.tech)+K_GRACE);
   }, 100);
 }
 
@@ -1732,14 +1742,14 @@ function cBeginAttack(){
   cShowPose(K.tech.s, K.tech, C.mirror);
   kRing.className='k-ring on';
   C.t0=performance.now();
-  var win = cWinDefend()+K_GRACE;
+  var win = cDefendThreshold(K.tech)+K_GRACE;
   C.timer=setTimeout(function(){ cResolveAttack(null); }, win);
 }
 function cResolveAttack(tap){
   if(C.state!=='rival_attack') return;
   clearTimeout(C.timer);
   var tech=C.pending;
-  var threshold = tech.isFeintReal ? C_WIN_FEINT_DEFEND : cWinDefend();
+  var threshold = cDefendThreshold(tech);
   var ok = tap && tap.onTarget && tap.dt<=threshold;
   if(!tech.isFeintReal){ cAdjustPlanDefend(ok); } // el amago-rival no cuenta para la racha del plan
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
