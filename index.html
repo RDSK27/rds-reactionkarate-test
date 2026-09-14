@@ -119,6 +119,12 @@ if('serviceWorker' in navigator){
   .segment button.sel{background:var(--rojo);color:#fff;text-shadow:none;}
   #seg2,#seg3{margin-top:0;}
 
+  /* Foto del rival (saludando) en la pantalla "Elige rival"/"Configura el
+     combate" -- se actualiza en vivo al cambiar Rival AKA/AO o
+     Masculino/Femenino, ver updateMsRivalPreview() (2026-09-14). */
+  .ms-rival-preview{ align-self:center; height:180px; width:auto; object-fit:contain;
+    background:linear-gradient(180deg,#dfe3e6,#c4c8cb); border-radius:8px; padding:6px 18px; }
+
   /* ---------- Acciones (mas pequenas y estrechas, como en la referencia) ---------- */
   .actions{display:flex;flex-direction:column;align-items:center;gap:6px;gap:clamp(4px,1svh,8px);margin-top:clamp(20px,4svh,40px);}
 
@@ -430,7 +436,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v47</div>
+    <div class="app-ver">v48</div>
     </div>
 
   </main>
@@ -450,6 +456,8 @@ if('serviceWorker' in navigator){
       <button class="sel" data-v="m">Masculino</button>
       <button data-v="f">Femenino</button>
     </div>
+
+    <img class="ms-rival-preview" id="msRivalPreview" alt="Rival">
 
     <div class="segment" id="segTime" style="display:none">
       <button class="sel" data-v="60">1 min</button>
@@ -724,6 +732,14 @@ function seg(id){
   });
 }
 function selVal(id){ var b=$(id).querySelector('button.sel'); return b?b.getAttribute('data-v'):null; }
+/* Foto del rival saludando en la pantalla previa (Elige rival/Configura el
+   combate) -- se actualiza al cambiar Rival AKA/AO o Masculino/Femenino. */
+function updateMsRivalPreview(){
+  var el=$('msRivalPreview'); if(!el) return;
+  var color = selVal('segColor')||'aka';
+  var gender = selVal('segGender')||'m';
+  el.src = 'assets/'+gender+'_'+color+'/saludo.png';
+}
 function setSeg(id,val){
   var bs=$(id).querySelectorAll('button'),i;
   for(i=0;i<bs.length;i++){ bs[i].classList.toggle('sel', bs[i].getAttribute('data-v')===String(val)); }
@@ -759,6 +775,7 @@ function openMatchSetup(){
   setSeg('segGender', S.gender);
   setSeg('segTime', String(S.cTime));
   setSeg('segStrategy', S.cStrategy);
+  updateMsRivalPreview();
   show('matchsetup');
 }
 function confirmMatchSetup(){
@@ -1015,6 +1032,8 @@ $('seg1').addEventListener('click', function(e){
 /* ---------- Wiring ---------- */
 seg('seg1'); seg('seg2'); seg('seg3');
 seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
+$('segColor').addEventListener('click', updateMsRivalPreview);
+$('segGender').addEventListener('click', updateMsRivalPreview);
 segRank('seg1R'); segRank('seg2R'); segRank('seg3R');
 $('btnRank2').addEventListener('click', showRanking);
 $('btnGuardar').addEventListener('click', function(){
