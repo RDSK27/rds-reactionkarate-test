@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v52</div>
+    <div class="app-ver">v53</div>
     </div>
 
   </main>
@@ -693,26 +693,61 @@ function sndPunch(){
   noise.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
   noise.start(t0); noise.stop(t0+0.1);
 }
+/* ---- Clips reales (kiai/whoosh): un único <audio> por archivo, reutilizado
+   en cada reproducción en vez de crear uno con `new Audio()` cada vez
+   (2026-09-14 -- el usuario reportó sonido que no sonaba o llegaba tarde,
+   sobre todo en la primera técnica de cada combate: cada `new Audio()`
+   tiene que empezar a descargar/decodificar el .wav desde cero la PRIMERA
+   vez que se pide ESE archivo en concreto, y como sndKiai sortea entre 2
+   archivos, "la primera técnica" en realidad podía ser la primera vez de
+   CUALQUIERA de los 4 .wav de kiai, no solo la primera llamada). Con
+   `sfxAudio()` el archivo se crea una sola vez y `primeSfx()` (llamada al
+   pulsar "Empezar", gesto real del usuario) lo reproduce mudo un instante
+   para forzar la descarga/decodificación Y desbloquear el audio en iOS
+   ANTES de que haga falta de verdad (los toques programados por
+   setTimeout, como los de este juego, no cuentan como gesto de usuario
+   por sí solos en Safari/iOS). */
+var _sfxCache = {};
+function sfxAudio(src){
+  var a = _sfxCache[src];
+  if(!a){ a = new Audio(src); a.preload='auto'; _sfxCache[src]=a; }
+  return a;
+}
+function playSfx(src, vol){
+  var a = sfxAudio(src);
+  try{ a.currentTime = 0; }catch(e){}
+  a.volume = vol;
+  a.play().catch(function(){});
+}
+var SFX_FILES = ['assets/sfx/kiai_m1.wav','assets/sfx/kiai_m2.wav','assets/sfx/kiai_f1.wav','assets/sfx/kiai_f2.wav',
+  'assets/sfx/whoosh_move.wav','assets/sfx/whoosh_amago.wav'];
+function primeSfx(){
+  SFX_FILES.forEach(function(src){
+    var a = sfxAudio(src);
+    a.volume = 0;
+    var p = a.play();
+    if(p && p.catch){ p.catch(function(){}); }
+    setTimeout(function(){ try{ a.pause(); a.currentTime=0; }catch(e){} }, 30);
+  });
+}
 var KIAI_SFX = { m:['assets/sfx/kiai_m1.wav','assets/sfx/kiai_m2.wav'], f:['assets/sfx/kiai_f1.wav','assets/sfx/kiai_f2.wav'] };
 function sndKiai(gender){
   var pool = KIAI_SFX[gender==='f'?'f':'m'];
   var src = pool[Math.floor(Math.random()*pool.length)];
-  var a = new Audio(src);
-  a.volume=0.85;
-  a.play().catch(function(){});
+  playSfx(src, 0.85);
 }
-/* Whoosh de movimiento (Ataque: el rival cambia de postura) -- recortado de
-   Freesound, ver assets/sfx/CREDITOS.txt. Sustituye al kiai en Ataque. */
+/* Whoosh de movimiento (Ataque: el rival cambia de postura; Combate: cambio
+   de guardia decorativo y la técnica FALSA de un amago rival) -- recortado
+   de Freesound, ver assets/sfx/CREDITOS.txt. Sustituye al kiai cuando no es
+   una técnica real. */
 function sndWhooshMove(){
-  var a = new Audio('assets/sfx/whoosh_move.wav');
-  a.volume=0.8;
-  a.play().catch(function(){});
+  playSfx('assets/sfx/whoosh_move.wav', 0.8);
 }
-/* Whoosh de amago (Combate: el jugador pulsa "Amago"). */
+/* Whoosh de amago (sin usar por ahora -- el sonido del pique del jugador se
+   quitó en v43 a petición expresa, se deja la función/el archivo listos
+   por si se retoma con este u otro sonido). */
 function sndWhooshAmago(){
-  var a = new Audio('assets/sfx/whoosh_amago.wav');
-  a.volume=0.8;
-  a.play().catch(function(){});
+  playSfx('assets/sfx/whoosh_amago.wav', 0.8);
 }
 
 /* ---------- Selectores segmentados ---------- */
@@ -781,6 +816,7 @@ function confirmMatchSetup(){
   }
   preloadSprites();
   applyCharHits();
+  primeSfx();
   runGame();
 }
 function repeatGame(){ runGame(); }
@@ -1750,6 +1786,7 @@ function cBeginFeintAttack(){
   var realName = cPickTech(fakeName);
   C.mirror = Math.random()<0.5;
   cShowPose(fakeName, null, C.mirror);
+  sndWhooshMove(); // técnica FALSA del amago -- whoosh, no kiai (no es una técnica real)
   kRing.className='k-ring'; // el amago no se toca, no hay aro
   C.timer=setTimeout(function(){
     if(C.state!=='rival_feint') return;
