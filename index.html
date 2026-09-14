@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v53</div>
+    <div class="app-ver">v54</div>
     </div>
 
   </main>
@@ -896,11 +896,20 @@ function finish(){
 function lbKey(a,b,c){ return 'rds_rkarate_'+a+'_'+b+'_'+c; }
 function loadLb(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } }
 function sortLb(lb){ lb.sort(function(a,b){ return MENOR_ES_MEJOR ? (a.avg-b.avg) : (b.avg-a.avg); }); }
+/* Combate no usa repeticiones/ritmo (seg2/seg3 del home quedan sin sentido
+   ahí, ver applyModeUI) -- su categoría real de ranking es tiempo+estrategia
+   (S.cTime/S.cStrategy, elegidos en "Configura el combate"). Defensa/Ataque
+   siguen usando S.s2/S.s3 tal cual (2026-09-14, pedido expreso: Combate
+   también tiene Guardar/Ranking). */
+function curKeyParts(){
+  return S.s1==='cmb' ? [S.s1, String(S.cTime||60), (S.cStrategy||'libre')] : [S.s1, S.s2, S.s3];
+}
 
 function saveScore(avg,total){
   var nm = S.sport ? (S.name+'-'+S.sport) : S.name;
-  var rec={ s1:S.s1, s2:S.s2, s3:S.s3, name:nm, ensayos:S.resEnsayos, avg:Math.round(avg), tt:Math.round(total), ts:Date.now() };
-  var k=lbKey(S.s1,S.s2,S.s3), lb=loadLb(k);
+  var kp = curKeyParts();
+  var rec={ s1:kp[0], s2:kp[1], s3:kp[2], name:nm, ensayos:S.resEnsayos, avg:Math.round(avg), tt:Math.round(total), ts:Date.now() };
+  var k=lbKey(kp[0],kp[1],kp[2]), lb=loadLb(k);
   lb.push(rec); sortLb(lb); lb=lb.slice(0,50);
   try{ localStorage.setItem(k,JSON.stringify(lb)); }catch(e){}
   S.lastRec=rec; S.lastRecKey=k;
@@ -989,8 +998,22 @@ function renderRankList(list, el, latest){
   }
 }
 
+/* seg2R/seg3R (10/25/50, Seguido/Espera) no significan nada para Combate
+   (ranking por tiempo+estrategia, ver curKeyParts) -- se ocultan y se
+   sustituyen por S.cTime/S.cStrategy en vez de leerlos. */
+function updateRankFilterVis(v1){
+  var isCmb = v1==='cmb';
+  $('seg2R').style.display = isCmb ? 'none' : 'flex';
+  $('seg3R').style.display = isCmb ? 'none' : 'flex';
+}
+function rankV2V3(v1){
+  return v1==='cmb' ? [String(S.cTime||60), (S.cStrategy||'libre')] : [selVal('seg2R')||'a', selVal('seg3R')||'a'];
+}
 function rankFromSel(){
-  renderRank(selVal('seg1R')||'a', selVal('seg2R')||'a', selVal('seg3R')||'a');
+  var v1 = selVal('seg1R')||'a';
+  updateRankFilterVis(v1);
+  var v23 = rankV2V3(v1);
+  renderRank(v1, v23[0], v23[1]);
 }
 function segRank(id){
   var box=$(id);
@@ -1018,15 +1041,20 @@ function showRanking(){
   var btn=document.getElementById('btn-hide-repeated');
   if(btn) btn.textContent='Mostrar repetidos';
   updateRankSaveBtn();
-  var v1=selVal('seg1')||'a', v2=selVal('seg2')||'a', v3=selVal('seg3')||'a';
-  setSeg('seg1R',v1); setSeg('seg2R',v2); setSeg('seg3R',v3);
-  renderRank(v1,v2,v3); show('ranking');
+  var v1=selVal('seg1')||'a';
+  setSeg('seg1R',v1);
+  updateRankFilterVis(v1);
+  var v23;
+  if(v1==='cmb'){ v23=[String(S.cTime||60), (S.cStrategy||'libre')]; }
+  else { v23=[selVal('seg2')||'a', selVal('seg3')||'a']; setSeg('seg2R',v23[0]); setSeg('seg3R',v23[1]); }
+  renderRank(v1,v23[0],v23[1]); show('ranking');
 }
 function renderRank(v1,v2,v3){
   var key=lbKey(v1,v2,v3); S.rankKey=key;
   var el=$('rkList'); if(!el) return;
   var latest=null;
-  if(S.saved===false && isFinite(S.resAvg) && lbKey(S.s1,S.s2,S.s3)===key){
+  var kp=curKeyParts();
+  if(S.saved===false && isFinite(S.resAvg) && lbKey(kp[0],kp[1],kp[2])===key){
     latest={ name:(S.sport?(S.name+'-'+S.sport):S.name), avg:Math.round(S.resAvg), ensayos:S.resEnsayos, ts:Date.now() };
   } else if(S.lastRec && S.lastRecKey===key){
     latest=S.lastRec;
@@ -1619,7 +1647,18 @@ function kFinish(){
    =================================================================== */
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
-          amagoUsed:0, amagoTotal:0, plan:null, guardUpTimer:0 };
+          amagoUsed:0, amagoTotal:0, plan:null, guardUpTimer:0,
+          times:[], attempts:0, hits:0 };
+/* Un "intento" = cualquier acción con ventana de tiempo en la que el
+   jugador reacciona (parar un ataque real, contraatacar tras pararlo,
+   entrar a un hueco tras un pique) -- alimenta la pantalla de resultados
+   de Combate (Media/Mejor/% Acierto), ver cFinishResults() más abajo.
+   El señuelo de un pique (postura sin hueco real) NO cuenta: ahí no hay
+   velocidad de reacción que medir, es una prueba de no tocar. */
+function cTrackAttempt(ok, tap){
+  C.attempts++;
+  if(ok){ C.hits++; C.times.push(Math.round(tap.dt)); }
+}
 var C_TERM = { yuko:'Yuko', 'waza-ari':'Waza-ari', ippon:'Ippon' };
 /* Valor (yuko/waza-ari/ippon) de un acierto de amago (por postura) o de
    contraataque tras parar (por técnica) -- calibrado en calibrar.html. */
@@ -1641,6 +1680,7 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
+  C.times=[]; C.attempts=0; C.hits=0;
   /* Botón/pips de Amago en el color del JUGADOR (aka=rojo/ao=azul),
      pedido expreso 2026-09-14 -- se sortea junto con C.akaSide arriba. */
   var playerColor = C.akaSide==='player' ? 'aka' : 'ao';
@@ -1824,6 +1864,7 @@ function cResolveAttack(tap){
   var tech=C.pending;
   var threshold = cDefendThreshold(tech);
   var ok = tap && tap.onTarget && tap.dt<=threshold;
+  cTrackAttempt(ok, tap);
   if(!ok){ C.state='done'; return cAwardPoint('rival', C_VALUES[tech.s]); }
   kRing.className='k-ring ok';
   var ctr = C_COUNTERS[tech.s];
@@ -1838,6 +1879,7 @@ function cResolveCounter(tap){
   if(C.state!=='counter_window') return;
   clearTimeout(C.timer);
   var ok = tap && tap.onTarget && tap.dt<=cWinParar();
+  cTrackAttempt(ok, tap);
   C.state='done';
   if(ok){
     // Parar un ataque de valor ippon y rematar el contraataque también vale
@@ -1927,6 +1969,7 @@ function cResolvePico(tap){
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
+    cTrackAttempt(ok, tap);
     if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
@@ -1972,7 +2015,7 @@ function cAwardPoint(side, value){
     }, 1000);
   }, 1000);
 }
-var PLAN_LABELS = { a:'Plan A', b:'Plan B', c:'Plan C' };
+var PLAN_LABELS = { a:'Plan A · Ataque', b:'Plan B · Defensa', c:'Plan C · Provocación' };
 function cEndMatch(){
   C.active=false; C.paused=true;
   clearInterval(C.timerId); clearTimeout(C.timer);
@@ -1983,6 +2026,29 @@ function cShowMatchEndBanner(){
   cShowPose('saludo', null, C.mirror); // el rival termina saludando -- 2026-09-14, pedido expreso
   var winner = C.scoreAka===C.scoreAo ? 'Empate' : (C.scoreAka>C.scoreAo ? 'Gana Aka' : 'Gana Ao');
   kSetStatus('Fin del combate · '+winner, 'end');
+  setTimeout(cFinishResults, 1800); // tiempo para leer el banner antes de pasar a Resultado
+}
+/* Pantalla de Resultado de Combate -- mismo quad 2x2 que Defensa/Ataque
+   (ver finish()), con "Puntos" (tú-rival) en vez de "Defendidas x/N" y
+   Media/Mejor/% Acierto calculados sobre C.times/C.attempts/C.hits
+   (cTrackAttempt(), ver arriba: para/contraataque/pique con hueco real,
+   2026-09-14, pedido expreso). */
+function cFinishResults(){
+  var n=C.times.length, sum=0, best=Infinity, i;
+  for(i=0;i<n;i++){ sum+=C.times[i]; if(C.times[i]<best) best=C.times[i]; }
+  var avg = n?sum/n:0;
+  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  $('resMsg').style.display='none'; $('resEns').style.display='none';
+  var rk2=$('rK2'); if(rk2) rk2.textContent='Puntos';
+  $('rV1').textContent=Math.round(avg);
+  $('rV2').textContent=playerScore+'-'+rivalScore;
+  $('rV3').textContent=(C.attempts?Math.round(C.hits/C.attempts*100):0)+'%';
+  $('rV4').textContent=(best===Infinity?'--':Math.round(best));
+  S.resAvg=avg; S.resTotal=Math.max(0,((S.cTime||60)-C.timeLeft))*1000; S.resEnsayos=n; S.saved=false;
+  renderChart(C.times);
+  var gb=$('btnGuardar'); if(gb){ gb.disabled=false; gb.textContent='Guardar resultado'; }
+  showSaveScreen();
 }
 /* Al terminar un combate con Táctica activa, preguntar qué plan usó el
    rival (igual que la lectura de táctica en Tenis) antes de mostrar el
