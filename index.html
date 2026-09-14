@@ -314,15 +314,27 @@ if('serviceWorker' in navigator){
      fin de combate) van pegados a la banda de marcador/tiempo, no al pecho. */
   .k-status.pop{ animation:kStatusPop .38s cubic-bezier(.34,1.56,.64,1); }
   @keyframes kStatusPop{ 0%{transform:scale(1);} 40%{transform:scale(1.22);} 100%{transform:scale(1);} }
-  .c-controls{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 14px; flex-shrink:0; }
-  .c-amago-btn{ background:#333; color:#fff; border:0; border-radius:6px; padding:12px 20px; font-weight:900;
-    display:flex; align-items:center; gap:12px; cursor:pointer; }
-  .c-amago-btn:disabled{ background:#999; cursor:not-allowed; }
-  .c-amago-label{ letter-spacing:.12em; text-transform:uppercase; font-size:.85rem; }
+  /* Botón de Amago DENTRO del tatami (2026-09-14, pedido expreso: "dentro
+     de la ventana del panel de acción"), redondo y grande para acertar el
+     toque sin mirar fijamente, anclado abajo -- vive dentro de #kStage
+     (no de .k-stage-wrap) para quedar siempre pegado al borde real del
+     tatami sin importar cuánto espacio vertical sobrante tenga el wrap.
+     Color según el lado del JUGADOR (aka=rojo/ao=azul), fijado en cStart(). */
+  .c-amago-wrap{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:6px; z-index:15; }
+  .c-amago-btn{ width:76px; height:76px; border-radius:50%; border:4px solid #111; color:#fff;
+    font-weight:900; letter-spacing:.05em; text-transform:uppercase; font-size:.68rem;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.4); }
+  .c-amago-btn.aka{ background:#c6302a; } .c-amago-btn.ao{ background:#1565d8; }
+  .c-amago-btn:disabled{ background:#999; border-color:#555; cursor:not-allowed; }
   .c-amago-pips{ display:flex; gap:5px; }
-  .c-amago-pip{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:.68rem; font-weight:900; background:rgba(255,255,255,.22); color:#fff; }
-  .c-amago-pip.dim{ background:rgba(255,255,255,.08); color:rgba(255,255,255,.4); }
+  .c-amago-pip{ width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:.64rem; font-weight:900; color:#fff; box-shadow:0 0 0 2px #111; }
+  .c-amago-wrap.aka .c-amago-pip{ background:#c6302a; }
+  .c-amago-wrap.ao .c-amago-pip{ background:#1565d8; }
+  .c-amago-wrap.aka .c-amago-pip.dim{ background:rgba(198,48,42,.25); color:rgba(255,255,255,.5); }
+  .c-amago-wrap.ao .c-amago-pip.dim{ background:rgba(21,101,216,.25); color:rgba(255,255,255,.5); }
 
   /* Pregunta "¿qué plan usó el rival?" al terminar un combate con Táctica. */
   .c-plan-quiz{ position:absolute; inset:0; z-index:20; background:rgba(17,17,17,.94);
@@ -418,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v46</div>
+    <div class="app-ver">v47</div>
     </div>
 
   </main>
@@ -487,13 +499,11 @@ if('serviceWorker' in navigator){
           </svg>
         </div>
         <div class="c-plan-quiz" id="cPlanQuiz" style="display:none"></div>
+        <div class="c-amago-wrap" id="cAmagoWrap" style="display:none">
+          <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()">AMAGO</button>
+          <span class="c-amago-pips" id="cAmagoPips"></span>
+        </div>
       </div>
-    </div>
-    <div class="c-controls" id="cControls" style="display:none">
-      <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()">
-        <span class="c-amago-label">Amago</span>
-        <span class="c-amago-pips" id="cAmagoPips"></span>
-      </button>
     </div>
   <div class="results-actions">
     <button class="game-ctrl-btn" onclick="goHome()">&#8592; Inicio</button>
@@ -1386,7 +1396,7 @@ function kStart(){
   var cmb = kMode()==='cmb';
   $('kHudNormal').style.display = cmb ? 'none' : 'flex';
   $('cHud').style.display = cmb ? 'flex' : 'none';
-  $('cControls').style.display = cmb ? 'flex' : 'none';
+  $('cAmagoWrap').style.display = cmb ? 'flex' : 'none';
   kStage.classList.toggle('cmb-mode', cmb);
   if(cmb){ cStart(); return; }
   K.total = parseInt(selVal('seg2'),10)||25;
@@ -1581,6 +1591,11 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
+  /* Botón/pips de Amago en el color del JUGADOR (aka=rojo/ao=azul),
+     pedido expreso 2026-09-14 -- se sortea junto con C.akaSide arriba. */
+  var playerColor = C.akaSide==='player' ? 'aka' : 'ao';
+  $('cAmagoBtn').className = 'c-amago-btn '+playerColor;
+  $('cAmagoWrap').className = 'c-amago-wrap '+playerColor;
   /* Con Táctica, el PLAN lo elige el juego al azar -- el jugador no lo ve,
      solo tiene que reconocerlo al final del combate (cAskPlanGuess). */
   var PLAN_KEYS = Object.keys(PLAN_CONFIG);
@@ -1786,6 +1801,7 @@ function cResolveCounter(tap){
 /* ---- Pique (amago) del jugador: pulsa "Amago" (pausa el combate), luego
    toca directamente sobre la guardia neutra -- el punto más cercano de
    C_AMAGO_POINTS decide qué postura de defensa activa el rival. ---- */
+var C_WIN_AMAGO_AIM = 1000; // ms para completar el amago (tocar la zona) tras pulsar el botón -- 2026-09-14, pedido expreso
 function cAmagoStart(){
   if(!C.active || C.state!=='parado') return;
   if(C.amagoUsed>=C.amagoTotal) return;
@@ -1794,6 +1810,15 @@ function cAmagoStart(){
   $('cAmagoBtn').disabled=true;
   cPauseTimer();
   kRing.className='k-ring'; kMark.className='k-mark';
+  /* El rival no puede hacer nada mientras tanto -- cScheduleNext/
+     cRivalSpontaneous exigen C.state==='parado', y aquí ya no lo es.
+     Si no se completa el toque a tiempo se pierde el intento SIN gastar
+     amago (el gasto es solo al completar el toque, cResolveAmagoAim). */
+  C.timer=setTimeout(function(){
+    if(C.state!=='amago_aim') return;
+    C.state='done'; C.paused=false;
+    C.timer=setTimeout(cParado, 300);
+  }, C_WIN_AMAGO_AIM);
 }
 function cNearestAmagoPose(hxF, hyF){
   var best=null, bestD=Infinity;
@@ -1806,6 +1831,7 @@ function cNearestAmagoPose(hxF, hyF){
 }
 function cResolveAmagoAim(ev){
   if(C.state!=='amago_aim') return;
+  clearTimeout(C.timer); // cancela el límite de C_WIN_AMAGO_AIM, ya se ha tocado a tiempo
   var r = kKata.getBoundingClientRect();
   var hxF = (ev.clientX - r.left) / r.width;
   var hyF = (ev.clientY - r.top) / r.height;
@@ -1903,6 +1929,7 @@ function cEndMatch(){
   if(C.plan){ cAskPlanGuess(); } else { cShowMatchEndBanner(); }
 }
 function cShowMatchEndBanner(){
+  cShowPose('saludo', null, C.mirror); // el rival termina saludando -- 2026-09-14, pedido expreso
   var winner = C.scoreAka===C.scoreAo ? 'Empate' : (C.scoreAka>C.scoreAo ? 'Gana Aka' : 'Gana Ao');
   kSetStatus('Fin del combate · '+winner, 'end');
 }
