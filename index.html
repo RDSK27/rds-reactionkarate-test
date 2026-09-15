@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v65</div>
+    <div class="app-ver">v66</div>
     </div>
 
   </main>
@@ -1269,7 +1269,7 @@ var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración d
 /* Umbrales BASE de Combate (antes de aplicar cAdaptivePenalty, ver abajo). */
 var C_WIN_DEFEND = 550;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
 var C_WIN_PICO_BASE = 350;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
-var C_WIN_PARAR_BASE = 400; // ms para contraatacar tras parar una técnica del rival
+var C_WIN_PARAR_BASE = 375; // ms para contraatacar tras parar una técnica del rival (-25ms, 2026-09-16, pedido expreso)
 var C_WIN_FEINT_DEFEND = 600; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
 /* Ajuste ADAPTATIVO por marcador, de vuelta (2026-09-15, pedido expreso --
    estuvo anulado desde el 2026-09-14). A partir de una ventaja de 2 puntos
@@ -1468,6 +1468,12 @@ var K_WINDOW_CONT = 525; // ms para llegar a defender/atacar en "Seguido" (+50ms
 var K_WINDOW_PAUS = 550; // ms para llegar a defender/atacar en "Espera" (+50ms pedido 2026-09-13)
 var K_ATK_EXTRA = 25; // Ataque 25ms más difícil que Defensa (pedido 2026-09-13)
 var K_GRACE  = 320;   // margen antes del punto automático
+/* Radio de acierto (px) alrededor del centro de la diana (.k-ring, 58px de
+   diámetro -> 29px de radio) -- antes era 46px, MÁS ANCHO que el propio
+   círculo dibujado, así que se podía acertar tocando fuera de lo que se ve.
+   2026-09-16, pedido expreso: "hay que pulsar dentro de la diana,
+   exclusivamente dentro de la diana" -- ahora coincide con el radio visible. */
+var K_HIT_RADIUS = 29;
 function kWindow(){
   if(K.tech && K.tech.s==='sweep_low') return K_SWEEP_WINDOW;
   var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
@@ -1944,8 +1950,8 @@ function cResolveCounter(tap){
   if(C.state!=='counter_window') return;
   clearTimeout(C.timer);
   var ok = tap && tap.onTarget && tap.dt<=cWinParar();
-  C.state='done';
   if(ok){
+    C.state='done';
     // Parar un ataque de valor ippon y rematar el contraataque también vale
     // ippon (2026-09-14) -- PERO solo si el rival me saca 3 puntos o más
     // (2026-09-15, pedido expreso): si no me saca esa ventaja, defender
@@ -1962,8 +1968,37 @@ function cResolveCounter(tap){
     }
     sndPunch(); // golpe de verdad conectado -- igual que en Ataque
     cAwardPoint('player', counterValue);
+    return;
   }
-  else { C.timer=setTimeout(cParado, 500); }
+  /* Si fallo mi contraataque, el 50% de las veces el rival repite la MISMA
+     técnica una vez más -- sí puedo volver a pararla (cResolveRetaliation,
+     ventana normal de defender), pero si la paro no se reabre otra ventana
+     de contraataque para mí (nada de encadenar). 2026-09-16, pedido
+     expreso, corregido tras una primera versión que lo hacía automático:
+     "sí que puedo pararlo, pero no volver a tirar yo otro". */
+  if(Math.random()<0.5){ return cBeginRetaliation(); }
+  C.state='done';
+  C.timer=setTimeout(cParado, 500);
+}
+function cBeginRetaliation(){
+  var tech = C.pending;
+  C.state='retaliation_attack';
+  cShowPose(tech.s, tech, C.mirror);
+  sndKiai(S.gender);
+  kRing.className='k-ring on';
+  C.t0=performance.now();
+  var win = cDefendThreshold(tech)+K_GRACE;
+  C.timer=setTimeout(function(){ cResolveRetaliation(null); }, win);
+}
+function cResolveRetaliation(tap){
+  if(C.state!=='retaliation_attack') return;
+  clearTimeout(C.timer);
+  var tech = C.pending;
+  var ok = tap && tap.onTarget && tap.dt<=cDefendThreshold(tech);
+  if(!ok){ C.state='done'; return cAwardPoint('rival','yuko'); }
+  C.state='done';
+  kRing.className='k-ring ok';
+  C.timer=setTimeout(cParado, 900);
 }
 
 /* ---- Pique (amago) del jugador: pulsa "Amago" (pausa el combate), luego
@@ -2157,10 +2192,11 @@ function cPointerDown(ev){
   var sr=kStage.getBoundingClientRect();
   kMark.style.left=(ev.clientX-sr.left)+'px'; kMark.style.top=(ev.clientY-sr.top)+'px';
   kMark.className='k-mark on';
-  var tap = { dt:dt, onTarget:(d<=46) };
+  var tap = { dt:dt, onTarget:(d<=K_HIT_RADIUS) };
   if(C.state==='rival_attack') return cResolveAttack(tap);
   if(C.state==='counter_window') return cResolveCounter(tap);
   if(C.state==='pico_window') return cResolvePico(tap);
+  if(C.state==='retaliation_attack') return cResolveRetaliation(tap);
 }
 
 document.addEventListener('pointerdown', function(ev){
@@ -2185,7 +2221,7 @@ document.addEventListener('pointerdown', function(ev){
   var sr=kStage.getBoundingClientRect();
   kMark.style.left=(ev.clientX-sr.left)+'px'; kMark.style.top=(ev.clientY-sr.top)+'px';
   kMark.className='k-mark on';
-  kResolve({ dt:dt, onTarget:(d<=46) });
+  kResolve({ dt:dt, onTarget:(d<=K_HIT_RADIUS) });
 });
 
 /* Inicio / Repetir de la barra del juego: corta el ejercicio en curso */
