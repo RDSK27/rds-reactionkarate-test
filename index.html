@@ -1516,6 +1516,11 @@ function kStart(){
   K.pace  = selVal('seg3')||'cont';
   K.rep=0; K.def=0; K.pt=0; K.state='idle';
   S.times=[]; S.kDef=0; S.kTotal=K.total;
+  /* Los contadores del HUD deben pintarse del color real de "yo"/"rival"
+     según lo elegido en Elige rival, igual que kShowFlag -- si no, la
+     bandera y el contador que sube pueden mostrar colores contradictorios. */
+  $('kHudDef').className = 'c-score c-score-'+kMineColor();
+  $('kHudPt').className  = 'c-score c-score-'+kRivalColor();
   kUpdHud(); kUpdReaction();
   kRing.className='k-ring'; kMark.className='k-mark'; $('kFlag').className='k-flag';
   kSetStatus('');
@@ -1583,11 +1588,11 @@ var kFlagTimer=0;
    rival elegido en matchsetup), fallo = color del rival -- sin texto,
    superpuesta sobre el tatami. Solo Ataque/Defensa; Combate ya tiene su
    propio marcador Aka/Ao y no usa esto. */
+function kRivalColor(){ return S.color==='ao' ? 'ao' : 'aka'; }
+function kMineColor(){ return kRivalColor()==='aka' ? 'ao' : 'aka'; }
 function kShowFlag(ok){
   var el=$('kFlag'); if(!el) return;
-  var rival = S.color==='ao' ? 'ao' : 'aka';
-  var mine  = rival==='aka' ? 'ao' : 'aka';
-  var color = ok ? mine : rival;
+  var color = ok ? kMineColor() : kRivalColor();
   clearTimeout(kFlagTimer);
   el.className = 'k-flag show '+color;
   kFlagTimer=setTimeout(function(){ el.classList.remove('show'); }, 550);
