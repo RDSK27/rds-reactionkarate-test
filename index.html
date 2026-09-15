@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v59</div>
+    <div class="app-ver">v60</div>
     </div>
 
   </main>
@@ -1266,19 +1266,33 @@ var C_DEFENDS = {
    tocar para provocar cada postura de defensa -- calibrado en calibrar.html
    (sección "Amago"), POR PERSONAJE igual que A_HITS/K_HITS/C_COUNTERS. */
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
-/* Umbrales de Combate: TODOS fijos y sin ajuste adaptativo (2026-09-14,
-   pedido expreso "para ir probando bien" -- se anuló tanto la penalización
-   por marcador de cAdaptivePenalty como la racha por plan de
-   cAdjustPlanDefend/cAdjustPlanAmago, y se subieron todos +100ms respecto
-   a sus valores anteriores). Solo Combate -- Defensa/Ataque (kWindow) no
-   se tocan. */
-/* -25ms más difícil en todo Combate (2026-09-14, pedido expreso, mismo día
-   que el ajuste anterior de +100ms). */
+/* Umbrales BASE de Combate (antes de aplicar cAdaptivePenalty, ver abajo). */
 var C_WIN_DEFEND = 550;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
 var C_WIN_PICO_BASE = 350;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
 var C_WIN_PARAR_BASE = 400; // ms para contraatacar tras parar una técnica del rival
 var C_WIN_FEINT_DEFEND = 600; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
-function cWinParar(){ return C_WIN_PARAR_BASE; }
+/* Ajuste ADAPTATIVO por marcador, de vuelta (2026-09-15, pedido expreso --
+   estuvo anulado desde el 2026-09-14). A partir de una ventaja de 2 puntos
+   (propia o del rival) TODOS los márgenes de reacción de Combate (parar,
+   contraataque, pique -- y esta vez, a diferencia de la versión original
+   de antes de esa fecha, TAMBIÉN parar/defender, incluidos sweep_low y el
+   golpe real de un amago rival, ver cDefendThreshold) se ajustan 10ms por
+   cada punto de ventaja MÁS ALLÁ del primero: ganando por 2 → -10ms (más
+   difícil), por 3 → -20ms, por 4 → -30ms... Perdiendo por 2 → +10ms (más
+   fácil), por 3 → +20ms... Con ventaja de 0 o 1 en cualquier sentido, sin
+   ajuste. Se recalcula en caliente cada vez (no es una racha con memoria
+   propia como la de los planes A/B que hubo hasta el 2026-09-14) -- por
+   eso "hasta que empate" no hace falta código aparte: en cuanto la
+   diferencia baja de 2, el ajuste desaparece solo. */
+function cAdaptivePenalty(){
+  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  var lead = playerScore - rivalScore;
+  if(lead>=2) return 10*(lead-1);
+  if(lead<=-2) return -10*(-lead-1);
+  return 0;
+}
+function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
 
 /* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
    Libre = comportamiento de siempre (ataques espontáneos al azar, sin
@@ -1302,20 +1316,24 @@ var PLAN_CONFIG = {
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 function cWinDefend(){
   var cfg=cPlanCfg();
-  return (cfg && cfg.defendStart!=null) ? cfg.defendStart : C_WIN_DEFEND;
+  var base = (cfg && cfg.defendStart!=null) ? cfg.defendStart : C_WIN_DEFEND;
+  return base - cAdaptivePenalty();
 }
 /* Umbral fijo para defender sweep_low, igual en Libre y en los 3 planes
    de Táctica (2026-09-14, pedido explícito: "muy difícil de localizar").
    Sustituye por completo a cWinDefend()/C_WIN_FEINT_DEFEND para esa
-   técnica -- no se suma a ninguno de los dos, los reemplaza. */
+   técnica -- no se suma a ninguno de los dos, los reemplaza. SÍ lleva el
+   ajuste adaptativo (2026-09-15): sigue siendo "defender un ataque real". */
 var K_SWEEP_WINDOW = 650; // -25ms, mismo ajuste que el resto de Combate (2026-09-15)
 function cDefendThreshold(tech){
-  if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW;
-  return (tech && tech.isFeintReal) ? C_WIN_FEINT_DEFEND : cWinDefend();
+  if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW - cAdaptivePenalty();
+  if(tech && tech.isFeintReal) return C_WIN_FEINT_DEFEND - cAdaptivePenalty();
+  return cWinDefend();
 }
 function cWinPico(){
   var cfg=cPlanCfg();
-  return (cfg && cfg.amagoStart!=null) ? cfg.amagoStart : C_WIN_PICO_BASE;
+  var base = (cfg && cfg.amagoStart!=null) ? cfg.amagoStart : C_WIN_PICO_BASE;
+  return base - cAdaptivePenalty();
 }
 /* Posturas de guardia/bloqueo que el rival puede enseñar como "cambio de
    guardia" puramente decorativo (Plan): sin aro, sin nada que tocar. */
