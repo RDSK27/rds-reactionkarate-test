@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v64</div>
+    <div class="app-ver">v65</div>
     </div>
 
   </main>
@@ -1297,23 +1297,39 @@ function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
 /* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
    Libre = comportamiento de siempre (ataques espontáneos al azar, sin
    cambios de guardia ni amagos del rival, defender/amago con los valores
-   de arriba). Con un Plan activo, el rival programa sus acciones según
-   3 tasas por minuto (técnica real / cambio de guardia sin más / "amago
-   rival" — ver cScheduleNext()). Planes A y B tienen además su propio
+   de arriba). Con un Plan activo, el rival tiene un número FIJO de cada
+   tipo de acción (técnica real / cambio de guardia sin más / "amago
+   rival") por minuto de duración del combate -- NO son tasas
+   probabilísticas: cScheduleNext() arma al empezar el combate una cola
+   con exactamente esos N de cada tipo (barajada) y los va consumiendo,
+   así el jugador puede aprender a identificar el plan contando eventos
+   reales, sin que la varianza de un sorteo se lo impida (2026-09-16,
+   pedido expreso: "quiero que sea cuentas fijas, si no, no se va a
+   identificar"). Por lo mismo se quitó el ajuste de ataques por marcador
+   (mitad/doble según iba ganando o perdiendo el rival) que hubo el
+   2026-09-15: con cuentas fijas ya no tiene sentido, el total no puede
+   cambiar a mitad de combate. Planes A y B tienen además su propio
    umbral fijo de defender (y B de amago) distinto del de Libre/Plan C --
-   ya NO suben/bajan por racha, ver nota de 2026-09-14 más arriba.
-   NOTA: "cambios de guardia" del Plan C = 2/min, igual que el Plan A, pese
-   a que el propio Plan C se describe como el que más juega con el cambio
-   de guardia -- se probó primero con 3/min (interpolando "Medio" entre el
-   2 de A y el 4 de B) pero el usuario confirmó que el número real es 2.
-   Ajuste posterior del mismo día: cambios de guardia x2 en los 3 planes,
-   y amagos rival +1 sobre el número de cada plan. */
+   ya NO suben/bajan por racha, ver nota de 2026-09-14 más arriba. */
 var PLAN_CONFIG = {
   a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:0, feintPerMin:5, defendStart:575 },
   b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:14, feintPerMin:3, defendStart:525, amagoStart:350 },
   c: { label:'Plan C · Provocación', atkPerMin:0, guardPerMin:5, feintPerMin:15 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
+/* Baraja (Fisher-Yates) la cola fija de eventos de un plan para un combate
+   de N minutos -- ver nota de arriba. */
+function cBuildPlanQueue(cfg, minutes){
+  var q=[], i;
+  for(i=0;i<Math.round(minutes*cfg.atkPerMin);i++) q.push('atk');
+  for(i=0;i<Math.round(minutes*cfg.guardPerMin);i++) q.push('guard');
+  for(i=0;i<Math.round(minutes*cfg.feintPerMin);i++) q.push('feint');
+  for(i=q.length-1;i>0;i--){
+    var j=Math.floor(Math.random()*(i+1));
+    var t=q[i]; q[i]=q[j]; q[j]=t;
+  }
+  return q;
+}
 function cWinDefend(){
   var cfg=cPlanCfg();
   var base = (cfg && cfg.defendStart!=null) ? cfg.defendStart : C_WIN_DEFEND;
@@ -1687,7 +1703,7 @@ function kFinish(){
    =================================================================== */
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
-          amagoUsed:0, amagoTotal:0, plan:null, guardUpTimer:0,
+          amagoUsed:0, amagoTotal:0, plan:null, planQueue:null, guardUpTimer:0,
           times:[], attempts:0, hits:0 };
 /* Un "intento" = SOLO parar un ataque real del rival (cResolveAttack,
    incluido el golpe real de un "amago rival") -- alimenta la pantalla de
@@ -1734,6 +1750,7 @@ function cStart(){
      solo tiene que reconocerlo al final del combate (cAskPlanGuess). */
   var PLAN_KEYS = Object.keys(PLAN_CONFIG);
   C.plan = (S.cStrategy==='tactica') ? PLAN_KEYS[Math.floor(Math.random()*PLAN_KEYS.length)] : null;
+  C.planQueue = C.plan ? cBuildPlanQueue(PLAN_CONFIG[C.plan], C.timeLeft/60) : null;
   K.pace='paus';
   cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
   $('cAmagoBtn').disabled=true;
@@ -1818,25 +1835,13 @@ function cRivalSpontaneous(){
   cBeginAttack();
 }
 /* Programa la siguiente acción del rival. Sin Táctica (Libre): igual que
-   siempre, un ataque espontáneo tras 1.5-4s. Con un Plan activo: se sortea
-   TIPO de acción (técnica real / cambio de guardia / "amago rival") según
-   las 3 tasas por minuto del plan, y el tiempo hasta esa acción sale de la
-   tasa total (para que el ritmo medio de verdad se acerque a esas tasas). */
-/* Ritmo de ataques reales del rival según el marcador (2026-09-15, pedido
-   expreso, solo Táctica -- Libre es la referencia y no se toca, igual que
-   en la ronda de "más ataques reales" de esta misma app): si el RIVAL va
-   ganando, ataca la mitad de veces; si va perdiendo, el doble. Empatados,
-   sin cambio. Se recalcula en cada cScheduleNext() a partir del marcador
-   actual (igual que cAdaptivePenalty), no es un valor fijado al empezar
-   el combate. Solo cambia atkPerMin -- guardPerMin/feintPerMin quedan tal
-   cual, así que sus propias tasas por minuto no se ven afectadas. */
-function cEffectiveAtkPerMin(base){
-  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
-  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
-  if(rivalScore>playerScore) return base/2;
-  if(rivalScore<playerScore) return base*2;
-  return base;
-}
+   siempre, un ataque espontáneo tras 1.5-4s. Con un Plan activo: se saca
+   el siguiente tipo de la cola FIJA barajada en cStart (C.planQueue, ver
+   cBuildPlanQueue) -- no hay sorteo por tasas, los totales de cada tipo
+   ya están decididos de antemano. El tiempo hasta esa acción sí sigue
+   siendo aleatorio (para no ser un metrónomo), calculado sobre el ritmo
+   medio del plan. Cola vacía = el rival no vuelve a actuar en lo que
+   queda de combate. */
 function cScheduleNext(){
   if(!C.active) return;
   var cfg = cPlanCfg();
@@ -1845,15 +1850,15 @@ function cScheduleNext(){
     C.timer=setTimeout(cRivalSpontaneous, lo+Math.random()*(hi-lo));
     return;
   }
-  var atk = cEffectiveAtkPerMin(cfg.atkPerMin);
-  var total = atk+cfg.guardPerMin+cfg.feintPerMin;
+  if(!C.planQueue || !C.planQueue.length) return;
+  var total = cfg.atkPerMin+cfg.guardPerMin+cfg.feintPerMin;
   var avgMs = 60000/total;
   var delay = avgMs*0.5 + Math.random()*avgMs; // entre 0.5x y 1.5x de la media, para no ser un metrónomo
   C.timer=setTimeout(function(){
-    if(!C.active || C.state!=='parado') return;
-    var r = Math.random()*total;
-    if(r < atk){ cBeginAttack(); }
-    else if(r < atk+cfg.guardPerMin){ cGuardChangeOnly(); }
+    if(!C.active || C.state!=='parado' || !C.planQueue.length) return;
+    var type = C.planQueue.shift();
+    if(type==='atk'){ cBeginAttack(); }
+    else if(type==='guard'){ cGuardChangeOnly(); }
     else { cBeginFeintAttack(); }
   }, delay);
 }
