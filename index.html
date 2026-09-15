@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v62</div>
+    <div class="app-ver">v63</div>
     </div>
 
   </main>
@@ -1950,6 +1950,7 @@ function cResolveCounter(tap){
     } else {
       counterValue = C_COUNTER_VALUES[C.pending.s]||'yuko';
     }
+    sndPunch(); // golpe de verdad conectado -- igual que en Ataque
     cAwardPoint('player', counterValue);
   }
   else { C.timer=setTimeout(cParado, 500); }
@@ -2033,7 +2034,7 @@ function cResolvePico(tap){
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
-    if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
+    if(ok){ C.state='done'; sndPunch(); return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
     C.timer=setTimeout(cParado, 500);
