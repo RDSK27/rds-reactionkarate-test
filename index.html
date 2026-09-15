@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v57</div>
+    <div class="app-ver">v58</div>
     </div>
 
   </main>
@@ -1666,12 +1666,16 @@ var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
           amagoUsed:0, amagoTotal:0, plan:null, guardUpTimer:0,
           times:[], attempts:0, hits:0 };
-/* Un "intento" = cualquier acción con ventana de tiempo en la que el
-   jugador reacciona (parar un ataque real, contraatacar tras pararlo,
-   entrar a un hueco tras un pique) -- alimenta la pantalla de resultados
-   de Combate (Media/Mejor/% Acierto), ver cFinishResults() más abajo.
-   El señuelo de un pique (postura sin hueco real) NO cuenta: ahí no hay
-   velocidad de reacción que medir, es una prueba de no tocar. */
+/* Un "intento" = SOLO parar un ataque real del rival (cResolveAttack,
+   incluido el golpe real de un "amago rival") -- alimenta la pantalla de
+   resultados de Combate (Media/Mejor/% Acierto), ver cFinishResults() más
+   abajo. 2026-09-15, corregido a petición expresa: el contraataque tras
+   parar y el acierto de un pique NO cuentan -- son reacciones a algo que
+   el JUGADOR ya inició (su propio pique, o el hueco que se abrió tras su
+   propia parada), no una reacción genuina al cambio del rival, y sesgaban
+   la media a la baja frente a Defensa/Ataque (donde TODO es reacción a un
+   cambio ajeno). "Que solo se reaccione al cambio del rival, que cuente
+   mi defensa a su ataque" -- petición literal del usuario. */
 function cTrackAttempt(ok, tap){
   C.attempts++;
   if(ok){ C.hits++; C.times.push(Math.round(tap.dt)); }
@@ -1896,7 +1900,6 @@ function cResolveCounter(tap){
   if(C.state!=='counter_window') return;
   clearTimeout(C.timer);
   var ok = tap && tap.onTarget && tap.dt<=cWinParar();
-  cTrackAttempt(ok, tap);
   C.state='done';
   if(ok){
     // Parar un ataque de valor ippon y rematar el contraataque también vale
@@ -1986,7 +1989,6 @@ function cResolvePico(tap){
   var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
-    cTrackAttempt(ok, tap);
     if(ok){ C.state='done'; return cAwardPoint('player', picoValue); }
     C.state='done';
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
@@ -2048,8 +2050,8 @@ function cShowMatchEndBanner(){
 /* Pantalla de Resultado de Combate -- mismo quad 2x2 que Defensa/Ataque
    (ver finish()), con "Puntos" (tú-rival) en vez de "Defendidas x/N" y
    Media/Mejor/% Acierto calculados sobre C.times/C.attempts/C.hits
-   (cTrackAttempt(), ver arriba: para/contraataque/pique con hueco real,
-   2026-09-14, pedido expreso). */
+   (cTrackAttempt(), ver arriba: solo parar el ataque real del rival,
+   2026-09-14/15, pedido expreso). */
 function cFinishResults(){
   var n=C.times.length, sum=0, best=Infinity, i;
   for(i=0;i<n;i++){ sum+=C.times[i]; if(C.times[i]<best) best=C.times[i]; }
