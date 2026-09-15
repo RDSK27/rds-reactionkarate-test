@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v55</div>
+    <div class="app-ver">v56</div>
     </div>
 
   </main>
@@ -1272,10 +1272,12 @@ var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración d
    cAdjustPlanDefend/cAdjustPlanAmago, y se subieron todos +100ms respecto
    a sus valores anteriores). Solo Combate -- Defensa/Ataque (kWindow) no
    se tocan. */
-var C_WIN_DEFEND = 600;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
-var C_WIN_PICO_BASE = 400;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
-var C_WIN_PARAR_BASE = 450; // ms para contraatacar tras parar una técnica del rival
-var C_WIN_FEINT_DEFEND = 650; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
+/* -25ms más difícil en todo Combate (2026-09-14, pedido expreso, mismo día
+   que el ajuste anterior de +100ms). */
+var C_WIN_DEFEND = 575;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
+var C_WIN_PICO_BASE = 375;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
+var C_WIN_PARAR_BASE = 425; // ms para contraatacar tras parar una técnica del rival
+var C_WIN_FEINT_DEFEND = 625; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
 function cWinParar(){ return C_WIN_PARAR_BASE; }
 
 /* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
@@ -1293,9 +1295,9 @@ function cWinParar(){ return C_WIN_PARAR_BASE; }
    Ajuste posterior del mismo día: cambios de guardia x2 en los 3 planes,
    y amagos rival +1 sobre el número de cada plan. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:5, feintPerMin:5, defendStart:625 },
-  b: { label:'Plan B · Defensa',     atkPerMin:7, guardPerMin:10, feintPerMin:5, defendStart:575, amagoStart:400 },
-  c: { label:'Plan C · Provocación', atkPerMin:11, guardPerMin:7, feintPerMin:7 }
+  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:0, feintPerMin:5, defendStart:600 },
+  b: { label:'Plan B · Defensa',     atkPerMin:0, guardPerMin:13, feintPerMin:7, defendStart:550, amagoStart:375 },
+  c: { label:'Plan C · Provocación', atkPerMin:5, guardPerMin:5, feintPerMin:10 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 function cWinDefend(){
@@ -1306,7 +1308,7 @@ function cWinDefend(){
    de Táctica (2026-09-14, pedido explícito: "muy difícil de localizar").
    Sustituye por completo a cWinDefend()/C_WIN_FEINT_DEFEND para esa
    técnica -- no se suma a ninguno de los dos, los reemplaza. */
-var K_SWEEP_WINDOW = 700;
+var K_SWEEP_WINDOW = 675; // -25ms, mismo ajuste que el resto de Combate (2026-09-14)
 function cDefendThreshold(tech){
   if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW;
   return (tech && tech.isFeintReal) ? C_WIN_FEINT_DEFEND : cWinDefend();
