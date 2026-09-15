@@ -430,7 +430,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v61</div>
+    <div class="app-ver">v62</div>
     </div>
 
   </main>
@@ -1817,6 +1817,21 @@ function cRivalSpontaneous(){
    TIPO de acción (técnica real / cambio de guardia / "amago rival") según
    las 3 tasas por minuto del plan, y el tiempo hasta esa acción sale de la
    tasa total (para que el ritmo medio de verdad se acerque a esas tasas). */
+/* Ritmo de ataques reales del rival según el marcador (2026-09-15, pedido
+   expreso, solo Táctica -- Libre es la referencia y no se toca, igual que
+   en la ronda de "más ataques reales" de esta misma app): si el RIVAL va
+   ganando, ataca la mitad de veces; si va perdiendo, el doble. Empatados,
+   sin cambio. Se recalcula en cada cScheduleNext() a partir del marcador
+   actual (igual que cAdaptivePenalty), no es un valor fijado al empezar
+   el combate. Solo cambia atkPerMin -- guardPerMin/feintPerMin quedan tal
+   cual, así que sus propias tasas por minuto no se ven afectadas. */
+function cEffectiveAtkPerMin(base){
+  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  if(rivalScore>playerScore) return base/2;
+  if(rivalScore<playerScore) return base*2;
+  return base;
+}
 function cScheduleNext(){
   if(!C.active) return;
   var cfg = cPlanCfg();
@@ -1825,14 +1840,15 @@ function cScheduleNext(){
     C.timer=setTimeout(cRivalSpontaneous, lo+Math.random()*(hi-lo));
     return;
   }
-  var total = cfg.atkPerMin+cfg.guardPerMin+cfg.feintPerMin;
+  var atk = cEffectiveAtkPerMin(cfg.atkPerMin);
+  var total = atk+cfg.guardPerMin+cfg.feintPerMin;
   var avgMs = 60000/total;
   var delay = avgMs*0.5 + Math.random()*avgMs; // entre 0.5x y 1.5x de la media, para no ser un metrónomo
   C.timer=setTimeout(function(){
     if(!C.active || C.state!=='parado') return;
     var r = Math.random()*total;
-    if(r < cfg.atkPerMin){ cBeginAttack(); }
-    else if(r < cfg.atkPerMin+cfg.guardPerMin){ cGuardChangeOnly(); }
+    if(r < atk){ cBeginAttack(); }
+    else if(r < atk+cfg.guardPerMin){ cGuardChangeOnly(); }
     else { cBeginFeintAttack(); }
   }, delay);
 }
