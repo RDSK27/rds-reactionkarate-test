@@ -310,31 +310,44 @@ if('serviceWorker' in navigator){
      fin de combate) van pegados a la banda de marcador/tiempo, no al pecho. */
   .k-status.pop{ animation:kStatusPop .38s cubic-bezier(.34,1.56,.64,1); }
   @keyframes kStatusPop{ 0%{transform:scale(1);} 40%{transform:scale(1.22);} 100%{transform:scale(1);} }
-  /* Botón de Amago DENTRO del tatami (2026-09-14, pedido expreso: "dentro
-     de la ventana del panel de acción"), redondo y grande para acertar el
-     toque sin mirar fijamente, pegado al borde inferior -- vive dentro de
-     #kStage (no de .k-stage-wrap) para quedar siempre alineado con el
-     borde real del tatami sin importar cuánto espacio vertical sobrante
-     tenga el wrap. Color según el lado del JUGADOR (aka=rojo/ao=azul),
-     fijado en cStart(). Las pips (amagos restantes) viven FUERA de la
-     ventana de acción, en su propia barra debajo del tatami (pedido
-     expreso, mismo día) -- ver .c-amago-pips-bar. */
-  .c-amago-btn{ position:absolute; left:50%; bottom:0; transform:translateX(-50%);
-    width:92px; height:92px; border-radius:50%; border:4px solid #111; color:#fff;
+  /* Botones de acción (Amago + Ataque) DENTRO del tatami (2026-09-14,
+     pedido expreso: "dentro de la ventana del panel de acción"), pegados
+     al borde inferior -- viven dentro de #kStage (no de .k-stage-wrap)
+     para quedar siempre alineados con el borde real del tatami sin
+     importar cuánto espacio vertical sobrante tenga el wrap. Color según
+     el lado del JUGADOR (aka=rojo/ao=azul), fijado en cStart(). Las pips
+     (usos restantes) viven FUERA de la ventana de acción, en su propia
+     barra debajo del tatami (pedido expreso, mismo día) -- ver
+     .c-amago-pips-bar/.c-atk-pips-bar. Ataque (2026-09-16, pedido
+     expreso) es un botón CUADRADO al lado del redondo de Amago -- de ahí
+     el wrapper .c-action-btns que centra el par como grupo en vez de
+     centrar cada botón por separado como antes. */
+  .c-action-btns{ position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    display:flex; align-items:flex-end; gap:14px; z-index:15; }
+  .c-amago-btn{ width:92px; height:92px; border-radius:50%; border:4px solid #111; color:#fff;
     font-weight:900; letter-spacing:.05em; text-transform:uppercase; font-size:.74rem;
     display:flex; align-items:center; justify-content:center; cursor:pointer;
-    box-shadow:0 4px 10px rgba(0,0,0,.4); z-index:15; }
+    box-shadow:0 4px 10px rgba(0,0,0,.4); }
   .c-amago-btn.aka{ background:#c6302a; } .c-amago-btn.ao{ background:#1565d8; }
   .c-amago-btn:disabled{ background:#999; border-color:#555; cursor:not-allowed; }
-  .c-amago-pips-bar{ display:flex; justify-content:center; padding:6px 14px; background:#111;
+  .c-atk-btn{ width:74px; height:74px; border-radius:14px; border:4px solid #111; color:#fff;
+    font-weight:900; letter-spacing:.05em; text-transform:uppercase; font-size:.68rem;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.4); margin-bottom:9px; }
+  .c-atk-btn.aka{ background:#c6302a; } .c-atk-btn.ao{ background:#1565d8; }
+  .c-atk-btn:disabled{ background:#999; border-color:#555; cursor:not-allowed; }
+  .c-amago-pips-bar, .c-atk-pips-bar{ display:flex; justify-content:center; padding:6px 14px; background:#111;
     border-radius:20px; box-shadow:0 3px 8px rgba(0,0,0,.3); flex-shrink:0; }
-  .c-amago-pips{ display:flex; gap:6px; }
-  .c-amago-pip{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  .c-atk-pips-bar{ margin-top:10px; } /* separado de la barra de amagos, no pegado -- pedido expreso */
+  .c-amago-pips, .c-atk-pips{ display:flex; gap:6px; }
+  .c-amago-pip, .c-atk-pip{ width:22px; height:22px; display:flex; align-items:center; justify-content:center;
     font-size:.68rem; font-weight:900; color:#fff; box-shadow:0 0 0 2px #111; }
-  .c-amago-pips-bar.aka .c-amago-pip{ background:#c6302a; }
-  .c-amago-pips-bar.ao .c-amago-pip{ background:#1565d8; }
-  .c-amago-pips-bar.aka .c-amago-pip.dim{ background:rgba(198,48,42,.25); color:rgba(255,255,255,.5); }
-  .c-amago-pips-bar.ao .c-amago-pip.dim{ background:rgba(21,101,216,.25); color:rgba(255,255,255,.5); }
+  .c-amago-pip{ border-radius:50%; }
+  .c-atk-pip{ border-radius:4px; } /* cuadrados, a diferencia de los círculos de amago -- pedido expreso */
+  .c-amago-pips-bar.aka .c-amago-pip, .c-atk-pips-bar.aka .c-atk-pip{ background:#c6302a; }
+  .c-amago-pips-bar.ao .c-amago-pip, .c-atk-pips-bar.ao .c-atk-pip{ background:#1565d8; }
+  .c-amago-pips-bar.aka .c-amago-pip.dim, .c-atk-pips-bar.aka .c-atk-pip.dim{ background:rgba(198,48,42,.25); color:rgba(255,255,255,.5); }
+  .c-amago-pips-bar.ao .c-amago-pip.dim, .c-atk-pips-bar.ao .c-atk-pip.dim{ background:rgba(21,101,216,.25); color:rgba(255,255,255,.5); }
 
   /* Pregunta "¿qué plan usó el rival?" al terminar un combate con Táctica. */
   .c-plan-quiz{ position:absolute; inset:0; z-index:20; background:rgba(17,17,17,.94);
@@ -430,7 +443,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v66</div>
+    <div class="app-ver">v67</div>
     </div>
 
   </main>
@@ -501,10 +514,16 @@ if('serviceWorker' in navigator){
           </svg>
         </div>
         <div class="c-plan-quiz" id="cPlanQuiz" style="display:none"></div>
-        <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()" style="display:none">AMAGO</button>
+        <div class="c-action-btns" id="cActionBtns">
+          <button class="c-amago-btn" id="cAmagoBtn" onclick="cAmagoStart()" style="display:none">AMAGO</button>
+          <button class="c-atk-btn" id="cAtkBtn" onclick="cAtkStart()" style="display:none">ATAQUE</button>
+        </div>
       </div>
       <div class="c-amago-pips-bar" id="cAmagoPipsBar" style="display:none">
         <span class="c-amago-pips" id="cAmagoPips"></span>
+      </div>
+      <div class="c-atk-pips-bar" id="cAtkPipsBar" style="display:none">
+        <span class="c-atk-pips" id="cAtkPips"></span>
       </div>
     </div>
   <div class="results-actions">
@@ -1266,6 +1285,25 @@ var C_DEFENDS = {
    tocar para provocar cada postura de defensa -- calibrado en calibrar.html
    (sección "Amago"), POR PERSONAJE igual que A_HITS/K_HITS/C_COUNTERS. */
 var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración del combate
+/* Botón "Ataque" (cuadrado, 2026-09-16, pedido expreso): ataque real del
+   JUGADOR, limitado a C_ATK_BTN_PER_MIN por minuto de combate (mismo
+   patrón que C_AMAGOS_PER_MIN). Un único toque sobre el rival hace de
+   apuntado Y ejecución a la vez: la zona que toco se calcula con el mismo
+   sistema de zonas de Amago (cNearestAmagoPose + C_DEFENDS -- solo hay 3
+   zonas reales ahí: cabeza/torso/costado_izq, el resto de posturas son
+   señuelo sin zona `''`). A los C_WIN_ATK_BTN (200ms) desde que pulso el
+   botón, el rival "tapa" en secreto una zona -- 70% cabeza, 30% repartido
+   entre las otras dos. Reglas de acierto (pedidas literalmente): si mi
+   zona NO coincide con la que tapa el rival, es punto SIEMPRE (aunque
+   llegue tarde); si coincide, solo es punto si llego a tiempo (dt<=200ms).
+   Si fallo (zona coincide y tarde, o toqué fuera de cualquier zona
+   calibrada, o no toqué a nada), 50% de que el rival contraataque de
+   verdad (cBeginAttack(), la ventana normal de defender, no una versión
+   reducida) -- mismo patrón 50% que cResolveCounter (v66). A diferencia
+   de Amago, esto NO pausa el reloj del combate (es una acción rápida en
+   tiempo real, como un ataque cualquiera, no una parada especial). */
+var C_ATK_BTN_PER_MIN = 3;
+var C_WIN_ATK_BTN = 200;
 /* Umbrales BASE de Combate (antes de aplicar cAdaptivePenalty, ver abajo). */
 var C_WIN_DEFEND = 550;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
 var C_WIN_PICO_BASE = 350;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
@@ -1532,6 +1570,8 @@ function kStart(){
   $('cHud').style.display = cmb ? 'flex' : 'none';
   $('cAmagoBtn').style.display = cmb ? 'flex' : 'none';
   $('cAmagoPipsBar').style.display = cmb ? 'flex' : 'none';
+  $('cAtkBtn').style.display = cmb ? 'flex' : 'none';
+  $('cAtkPipsBar').style.display = cmb ? 'flex' : 'none';
   kStage.classList.toggle('cmb-mode', cmb);
   if(cmb){ cStart(); return; }
   K.total = parseInt(selVal('seg2'),10)||25;
@@ -1710,6 +1750,7 @@ function kFinish(){
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
           amagoUsed:0, amagoTotal:0, plan:null, planQueue:null, guardUpTimer:0,
+          atkBtnUsed:0, atkBtnTotal:0, atkRivalZone:null,
           times:[], attempts:0, hits:0 };
 /* Un "intento" = SOLO parar un ataque real del rival (cResolveAttack,
    incluido el golpe real de un "amago rival") -- alimenta la pantalla de
@@ -1746,20 +1787,24 @@ function cStart(){
   C.akaSide = S.color==='aka' ? 'rival' : 'player';
   C.active=true; C.paused=true; C.state='idle';
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
+  C.atkBtnUsed=0; C.atkBtnTotal=Math.round(C.timeLeft/60)*C_ATK_BTN_PER_MIN;
   C.times=[]; C.attempts=0; C.hits=0;
-  /* Botón/pips de Amago en el color del JUGADOR (aka=rojo/ao=azul),
-     pedido expreso 2026-09-14 -- se sortea junto con C.akaSide arriba. */
+  /* Botones/pips de Amago y Ataque en el color del JUGADOR (aka=rojo/
+     ao=azul), pedido expreso 2026-09-14 (Amago) / 2026-09-16 (Ataque) --
+     se sortea junto con C.akaSide arriba. */
   var playerColor = C.akaSide==='player' ? 'aka' : 'ao';
   $('cAmagoBtn').className = 'c-amago-btn '+playerColor;
   $('cAmagoPipsBar').className = 'c-amago-pips-bar '+playerColor;
+  $('cAtkBtn').className = 'c-atk-btn '+playerColor;
+  $('cAtkPipsBar').className = 'c-atk-pips-bar '+playerColor;
   /* Con Táctica, el PLAN lo elige el juego al azar -- el jugador no lo ve,
      solo tiene que reconocerlo al final del combate (cAskPlanGuess). */
   var PLAN_KEYS = Object.keys(PLAN_CONFIG);
   C.plan = (S.cStrategy==='tactica') ? PLAN_KEYS[Math.floor(Math.random()*PLAN_KEYS.length)] : null;
   C.planQueue = C.plan ? cBuildPlanQueue(PLAN_CONFIG[C.plan], C.timeLeft/60) : null;
   K.pace='paus';
-  cUpdateScore(); cUpdateTimer(); cRenderAmagoPips();
-  $('cAmagoBtn').disabled=true;
+  cUpdateScore(); cUpdateTimer(); cRenderAmagoPips(); cRenderAtkPips();
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   kRing.className='k-ring'; kMark.className='k-mark';
   kSetStatus('');
   C.mirror = Math.random()<0.5;
@@ -1834,6 +1879,7 @@ function cParado(){
   cShowPose('guard_base', null, C.mirror);
   kSetStatus('');
   $('cAmagoBtn').disabled = (C.amagoUsed>=C.amagoTotal);
+  $('cAtkBtn').disabled = (C.atkBtnUsed>=C.atkBtnTotal);
   cScheduleNext();
 }
 function cRivalSpontaneous(){
@@ -1891,7 +1937,7 @@ function cGuardChangeOnly(){
 function cBeginFeintAttack(){
   if(!C.active || C.state!=='parado') return;
   clearTimeout(C.timer);
-  $('cAmagoBtn').disabled=true;
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   C.state='rival_feint';
   var fakeName = cPickTech();
   var realName = cPickTech(fakeName);
@@ -1917,7 +1963,7 @@ function cBeginFeintAttack(){
 function cBeginAttack(){
   clearTimeout(C.timer);
   C.state='rival_attack';
-  $('cAmagoBtn').disabled=true;
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   var name = cPickTech();
   K.tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
   C.pending = K.tech;
@@ -1982,6 +2028,7 @@ function cResolveCounter(tap){
 }
 function cBeginRetaliation(){
   var tech = C.pending;
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   C.state='retaliation_attack';
   cShowPose(tech.s, tech, C.mirror);
   sndKiai(S.gender);
@@ -2010,7 +2057,7 @@ function cAmagoStart(){
   if(C.amagoUsed>=C.amagoTotal) return;
   clearTimeout(C.timer);
   C.state='amago_aim';
-  $('cAmagoBtn').disabled=true;
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   cPauseTimer();
   kRing.className='k-ring'; kMark.className='k-mark';
   /* El rival no puede hacer nada mientras tanto -- cScheduleNext/
@@ -2090,6 +2137,58 @@ function cResolvePico(tap){
   }
 }
 
+/* ---- Botón "Ataque" del jugador (cuadrado, 2026-09-16, pedido expreso):
+   ataque real, no un amago -- un único toque sobre el rival apunta Y
+   ejecuta a la vez (a diferencia de Amago, que primero elige zona y LUEGO
+   abre una ventana aparte para golpear el hueco). Ver comentario junto a
+   C_ATK_BTN_PER_MIN/C_WIN_ATK_BTN (arriba, junto a C_AMAGOS_PER_MIN) para
+   las reglas completas de acierto. ---- */
+function cRenderAtkPips(){
+  var el = $('cAtkPips'); if(!el) return;
+  el.innerHTML='';
+  for(var i=0;i<C.atkBtnTotal;i++){
+    var span = document.createElement('span');
+    span.className = 'c-atk-pip'+(i<C.atkBtnUsed?' dim':'');
+    span.textContent = i+1;
+    el.appendChild(span);
+  }
+}
+function cAtkStart(){
+  if(!C.active || C.state!=='parado') return;
+  if(C.atkBtnUsed>=C.atkBtnTotal) return;
+  clearTimeout(C.timer);
+  C.atkBtnUsed++;
+  cRenderAtkPips();
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
+  C.state='atk_btn_aim';
+  kRing.className='k-ring'; kMark.className='k-mark';
+  // El rival decide en secreto qué zona va a tapar a los 200ms -- 70% cabeza, 30% repartido entre las otras dos zonas reales.
+  C.atkRivalZone = Math.random()<0.7 ? 'cabeza' : (Math.random()<0.5 ? 'torso' : 'costado_izq');
+  C.t0 = performance.now();
+  C.timer=setTimeout(function(){ cResolveAtkBtn(null); }, C_WIN_ATK_BTN+K_GRACE);
+}
+function cResolveAtkBtn(tap){
+  if(C.state!=='atk_btn_aim') return;
+  clearTimeout(C.timer);
+  C.state='done';
+  var myZone = null;
+  if(tap && tap.ev){
+    var r = kKata.getBoundingClientRect();
+    var hxF = (tap.ev.clientX - r.left) / r.width;
+    var hyF = (tap.ev.clientY - r.top) / r.height;
+    var hxCanon = C.mirror ? (1-hxF) : hxF; // la guardia neutra puede estar espejada -- deshacerlo antes de comparar
+    var pose = cNearestAmagoPose(hxCanon, hyF);
+    myZone = (pose && C_DEFENDS[pose]) || null; // '' (señuelo, guard_base/guard_closed) o sin pose calibrada -> null
+  }
+  var landed;
+  if(!myZone){ landed=false; } // no toqué a tiempo, o toqué fuera de cualquier zona real
+  else if(myZone!==C.atkRivalZone){ landed=true; } // el rival tapaba otro sitio: entra siempre, aunque llegue tarde
+  else { landed = tap.dt<=C_WIN_ATK_BTN; } // mismo sitio: solo si llego antes de que tape
+  if(landed){ sndPunch(); return cAwardPoint('player','yuko'); }
+  if(Math.random()<0.5){ return cBeginAttack(); } // fallo -> 50% de que el rival contraataque de verdad
+  C.timer=setTimeout(cParado, 500);
+}
+
 /* Bandera del color que anota el punto (aka=rojo, ao=azul) -- reutiliza el
    mismo elemento #kFlag y kFlagTimer de Ataque/Defensa. */
 function cShowFlagColor(color){
@@ -2128,7 +2227,7 @@ var PLAN_LABELS = { a:'A- Ataque', b:'B- Defensa', c:'C- Provocación' };
 function cEndMatch(){
   C.active=false; C.paused=true;
   clearInterval(C.timerId); clearTimeout(C.timer);
-  $('cAmagoBtn').disabled=true;
+  $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   if(C.plan){ cAskPlanGuess(); } else { cShowMatchEndBanner(); }
 }
 function cShowMatchEndBanner(){
@@ -2192,11 +2291,12 @@ function cPointerDown(ev){
   var sr=kStage.getBoundingClientRect();
   kMark.style.left=(ev.clientX-sr.left)+'px'; kMark.style.top=(ev.clientY-sr.top)+'px';
   kMark.className='k-mark on';
-  var tap = { dt:dt, onTarget:(d<=K_HIT_RADIUS) };
+  var tap = { dt:dt, onTarget:(d<=K_HIT_RADIUS), ev:ev };
   if(C.state==='rival_attack') return cResolveAttack(tap);
   if(C.state==='counter_window') return cResolveCounter(tap);
   if(C.state==='pico_window') return cResolvePico(tap);
   if(C.state==='retaliation_attack') return cResolveRetaliation(tap);
+  if(C.state==='atk_btn_aim') return cResolveAtkBtn(tap);
 }
 
 document.addEventListener('pointerdown', function(ev){
