@@ -443,7 +443,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v69</div>
+    <div class="app-ver">v70</div>
     </div>
 
   </main>
@@ -1288,22 +1288,32 @@ var C_AMAGOS_PER_MIN = 5; // nº de amagos disponibles por minuto de duración d
 /* Botón "Ataque" (cuadrado, 2026-09-16, pedido expreso): ataque real del
    JUGADOR, limitado a C_ATK_BTN_PER_MIN por minuto de combate (mismo
    patrón que C_AMAGOS_PER_MIN). Un único toque sobre el rival hace de
-   apuntado Y ejecución a la vez: la zona que toco se calcula con el mismo
-   sistema de zonas de Amago (cNearestAmagoPose + C_DEFENDS -- solo hay 3
-   zonas reales ahí: cabeza/torso/costado_izq, el resto de posturas son
-   señuelo sin zona `''`). A los C_WIN_ATK_BTN (200ms) desde que pulso el
+   apuntado Y ejecución a la vez: la zona que toco se calcula con
+   cNearestAtkZone (3 zonas reales: cabeza/torso/costado_izq -- ver
+   C_ATK_ZONE_POINTS). A los C_WIN_ATK_BTN (175ms) desde que pulso el
    botón, el rival "tapa" en secreto una zona -- 70% cabeza, 30% repartido
    entre las otras dos. Reglas de acierto (pedidas literalmente): si mi
    zona NO coincide con la que tapa el rival, es punto SIEMPRE (aunque
-   llegue tarde); si coincide, solo es punto si llego a tiempo (dt<=200ms).
-   Si fallo (zona coincide y tarde, o toqué fuera de cualquier zona
-   calibrada, o no toqué a nada), 50% de que el rival contraataque de
-   verdad (cBeginAttack(), la ventana normal de defender, no una versión
-   reducida) -- mismo patrón 50% que cResolveCounter (v66). A diferencia
+   llegue tarde); si coincide, solo es punto si llego a tiempo
+   (dt<=C_WIN_ATK_BTN). Si fallo (zona coincide y tarde, o toqué fuera de
+   cualquier zona, o no toqué a nada), 1 de cada 3 veces
+   (C_ATK_BTN_COUNTER_P) el rival contraataca de verdad (cBeginAttack(),
+   ventana normal de defender) -- corregido 2026-09-16 de un 50% inicial
+   tras pedido expreso ("de tres veces en una hace ataque"). A diferencia
    de Amago, esto NO pausa el reloj del combate (es una acción rápida en
-   tiempo real, como un ataque cualquiera, no una parada especial). */
+   tiempo real, como un ataque cualquiera, no una parada especial).
+   VISUAL (añadido 2026-09-16, corrigiendo que antes el rival no se movía
+   nunca y parecía que "no defendía nada"): a los C_WIN_ATK_BTN ms en
+   punto, si todavía no he resuelto el ataque (sigo en 'atk_btn_aim'), el
+   rival enseña un movimiento de bloqueo real hacia la zona secreta
+   elegida (C_ATK_ZONE_POSE, guardUpTimer -- mismo campo que usa el
+   guardUpTimer de Amago/Pico, nunca coinciden en el tiempo). Si llego
+   antes de esos 175ms ni siquiera se llega a ver: gano la carrera antes
+   de que el bloqueo aparezca. */
 var C_ATK_BTN_PER_MIN = 3;
-var C_WIN_ATK_BTN = 200;
+var C_WIN_ATK_BTN = 175;
+var C_ATK_BTN_COUNTER_P = 1/3;
+var C_ATK_ZONE_POSE = { cabeza:'block_high', torso:'cover', costado_izq:'block_side' };
 /* Umbrales BASE de Combate (antes de aplicar cAdaptivePenalty, ver abajo). */
 var C_WIN_DEFEND = 550;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
 var C_WIN_PICO_BASE = 350;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
@@ -2194,14 +2204,20 @@ function cAtkStart(){
   $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   C.state='atk_btn_aim';
   kRing.className='k-ring'; kMark.className='k-mark';
-  // El rival decide en secreto qué zona va a tapar a los 200ms -- 70% cabeza, 30% repartido entre las otras dos zonas reales.
+  // El rival decide en secreto qué zona va a tapar a los C_WIN_ATK_BTN ms -- 70% cabeza, 30% repartido entre las otras dos zonas reales.
   C.atkRivalZone = Math.random()<0.7 ? 'cabeza' : (Math.random()<0.5 ? 'torso' : 'costado_izq');
   C.t0 = performance.now();
   C.timer=setTimeout(function(){ cResolveAtkBtn(null); }, C_WIN_ATK_BTN+K_GRACE);
+  // Movimiento de bloqueo VISIBLE justo al cerrarse la ventana -- si para entonces ya resolví
+  // (toqué antes), esto ni se llega a mostrar: gané la carrera antes de que se vea el bloqueo.
+  C.guardUpTimer = setTimeout(function(){
+    if(C.state!=='atk_btn_aim') return;
+    cShowPose(C_ATK_ZONE_POSE[C.atkRivalZone], null, C.mirror);
+  }, C_WIN_ATK_BTN);
 }
 function cResolveAtkBtn(tap){
   if(C.state!=='atk_btn_aim') return;
-  clearTimeout(C.timer);
+  clearTimeout(C.timer); clearTimeout(C.guardUpTimer);
   C.state='done';
   var myZone = null;
   if(tap && tap.ev){
@@ -2220,7 +2236,7 @@ function cResolveAtkBtn(tap){
   else if(myZone!==C.atkRivalZone){ landed=true; } // el rival tapaba otro sitio: entra siempre, aunque llegue tarde
   else { landed = tap.dt<=C_WIN_ATK_BTN; } // mismo sitio: solo si llego antes de que tape
   if(landed){ sndPunch(); return cAwardPoint('player','yuko'); }
-  if(Math.random()<0.5){ return cBeginAttack(); } // fallo -> 50% de que el rival contraataque de verdad
+  if(Math.random()<C_ATK_BTN_COUNTER_P){ return cBeginAttack(); } // fallo -> 1/3 de que el rival contraataque de verdad
   C.timer=setTimeout(cParado, 500);
 }
 
