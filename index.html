@@ -443,7 +443,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v70</div>
+    <div class="app-ver">v71</div>
     </div>
 
   </main>
@@ -1315,10 +1315,10 @@ var C_WIN_ATK_BTN = 175;
 var C_ATK_BTN_COUNTER_P = 1/3;
 var C_ATK_ZONE_POSE = { cabeza:'block_high', torso:'cover', costado_izq:'block_side' };
 /* Umbrales BASE de Combate (antes de aplicar cAdaptivePenalty, ver abajo). */
-var C_WIN_DEFEND = 550;     // ms para parar/defender el ataque real del rival (Libre / Plan C)
-var C_WIN_PICO_BASE = 350;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C)
-var C_WIN_PARAR_BASE = 375; // ms para contraatacar tras parar una técnica del rival (-25ms, 2026-09-16, pedido expreso)
-var C_WIN_FEINT_DEFEND = 600; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes
+var C_WIN_DEFEND = 500;     // ms para parar/defender el ataque real del rival (Libre / Plan C) (-50ms, 2026-09-17, pedido expreso)
+var C_WIN_PICO_BASE = 300;  // ms para entrar al hueco tras un pique (Libre / Plan A / Plan C) (-50ms, 2026-09-17)
+var C_WIN_PARAR_BASE = 350; // ms para contraatacar tras parar una técnica del rival (-25ms, 2026-09-17, pedido expreso)
+var C_WIN_FEINT_DEFEND = 500; // ms para defender la técnica DEFINITIVA de un "amago rival" -- igual en los 3 planes (-100ms, 2026-09-17)
 /* Ajuste ADAPTATIVO por marcador, de vuelta (2026-09-15, pedido expreso --
    estuvo anulado desde el 2026-09-14). A partir de una ventaja de 2 puntos
    (propia o del rival) TODOS los márgenes de reacción de Combate (parar,
@@ -1360,8 +1360,8 @@ function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
    umbral fijo de defender (y B de amago) distinto del de Libre/Plan C --
    ya NO suben/bajan por racha, ver nota de 2026-09-14 más arriba. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:0, feintPerMin:5, defendStart:575 },
-  b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:14, feintPerMin:3, defendStart:525, amagoStart:350 },
+  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:0, feintPerMin:5, defendStart:525 },
+  b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:14, feintPerMin:3, defendStart:475, amagoStart:300 },
   c: { label:'Plan C · Provocación', atkPerMin:0, guardPerMin:5, feintPerMin:15 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
@@ -1388,7 +1388,7 @@ function cWinDefend(){
    Sustituye por completo a cWinDefend()/C_WIN_FEINT_DEFEND para esa
    técnica -- no se suma a ninguno de los dos, los reemplaza. SÍ lleva el
    ajuste adaptativo (2026-09-15): sigue siendo "defender un ataque real". */
-var K_SWEEP_WINDOW = 650; // -25ms, mismo ajuste que el resto de Combate (2026-09-15)
+var K_SWEEP_WINDOW = 550; // -100ms, 2026-09-17, pedido expreso -- unico valor, compartido por Defensa/Ataque/Combate
 function cDefendThreshold(tech){
   if(tech && tech.s==='sweep_low') return K_SWEEP_WINDOW - cAdaptivePenalty();
   if(tech && tech.isFeintReal) return C_WIN_FEINT_DEFEND - cAdaptivePenalty();
@@ -1544,9 +1544,9 @@ applyCharHits();
    1:1 con las nuevas -- asumido a propósito, a diferencia de processing
    (ver rds-processing-test, mismo día: ahí se decidió NO aplicarlo). */
 var DISPLAY_CORRECTION = 30;
-var K_WINDOW_CONT = 525; // ms para llegar a defender/atacar en "Seguido" (+50ms pedido 2026-09-13)
-var K_WINDOW_PAUS = 550; // ms para llegar a defender/atacar en "Espera" (+50ms pedido 2026-09-13)
-var K_ATK_EXTRA = 25; // Ataque 25ms más difícil que Defensa (pedido 2026-09-13)
+var K_WINDOW_CONT = 475; // ms para llegar a defender/atacar en "Seguido" (-50ms, 2026-09-17, pedido expreso)
+var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar en "Espera" (-50ms, 2026-09-17, pedido expreso)
+var K_ATK_EXTRA = 0; // Ataque ya NO es más difícil que Defensa -- quitado 2026-09-17, pedido expreso (antes 25ms)
 var K_GRACE  = 320;   // margen antes del punto automático
 /* Radio de acierto (px) alrededor del centro de la diana (.k-ring, 58px de
    diámetro -> 29px de radio) -- antes era 46px, MÁS ANCHO que el propio
