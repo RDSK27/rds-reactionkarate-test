@@ -443,7 +443,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v71</div>
+    <div class="app-ver">v72</div>
     </div>
 
   </main>
@@ -2173,7 +2173,16 @@ function cResolvePico(tap){
     if(Math.random()<0.5){ return cBeginAttack(); } // el rival puede castigar el pique fallido con un ataque real
     C.timer=setTimeout(cParado, 500);
   } else {
-    if(tap){ C.state='done'; return cAwardPoint('rival', picoValue); } // atacó una guardia cerrada: contragolpe
+    /* Atacaste una guardia cerrada/señuelo (sin hueco real) -- el rival
+       contraataca, pero AHORA con una técnica real y visible que hay que
+       parar (cBeginAttack), no un punto instantáneo como antes. Unificado
+       2026-09-18, pedido expreso tras confirmar que era justo eso lo que
+       parecía "un fallo" (rival anota de golpe, sin técnica visible, en
+       vez de dar opción a defenderla como en el resto de contraataques de
+       amago). A diferencia del pique-real-fallido (50%), aquí es SIEMPRE
+       (100%): tocar un señuelo es un error de lectura claro, no un simple
+       fallo de puntería. */
+    if(tap){ C.state='done'; return cBeginAttack(); }
     C.state='done';
     C.timer=setTimeout(cParado, 400);
   }
