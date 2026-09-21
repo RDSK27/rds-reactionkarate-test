@@ -115,6 +115,31 @@ if('serviceWorker' in navigator){
   .ms-rival-preview{ align-self:center; height:180px; width:auto; object-fit:contain;
     background:linear-gradient(180deg,#dfe3e6,#c4c8cb); border-radius:8px; padding:6px 18px; }
 
+  /* ---------- Campeonato: cuadro de enfrentamientos (cuartos -> semis -> final) ----------
+     Cada columna reparte sus cruces con space-around, asi cada cruce queda centrado entre
+     los dos cruces de los que sale sin dibujar lineas de conexion. */
+  .br-round{ text-align:center; font-weight:900; letter-spacing:.14em; text-transform:uppercase; font-size:.72rem; color:var(--rojo); margin-top:2px; }
+  .br-heads, .br-cols{ display:flex; gap:5px; width:100%; box-sizing:border-box; padding:0 4px; }
+  .br-heads span{ font-size:9px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#777; text-align:center; }
+  .br-heads .qf, .br-col.qf{ flex:1.55; min-width:0; }
+  .br-heads .sf, .br-col.sf{ flex:1.15; min-width:0; }
+  .br-heads .fi, .br-col.fi{ flex:1.15; min-width:0; }
+  .br-heads .ch, .br-col.ch{ flex:1; min-width:0; }
+  .br-cols{ height:min(46svh,330px); }
+  .br-col{ display:flex; flex-direction:column; justify-content:space-around; }
+  .br-match{ display:flex; flex-direction:column; gap:2px; border-left:3px solid #b03020; padding-left:3px; }
+  .br-slot{ display:block; width:100%; height:25px; line-height:25px; margin:0; padding:0 5px; border:0; border-radius:0; box-sizing:border-box;
+    background:#111; color:#fff; font-family:inherit; font-weight:800; font-size:10.5px; letter-spacing:.03em; text-transform:uppercase;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; outline:none; }
+  .br-slot.me{ background:var(--rojo); }
+  .br-slot.win{ box-shadow:inset 0 -3px 0 #f0c020; }
+  .br-slot.lose{ background:#444; color:#999; }
+  .br-slot.tbd{ background:#d9dcdf; color:#8a8f94; text-align:center; }
+  .br-slot.champ{ background:#f0c020; color:#111; text-align:center; }
+  input.br-slot::placeholder{ color:#777; }
+  input.br-slot:focus{ box-shadow:0 0 0 2px #f0c020; }
+  .br-note{ text-align:center; font-weight:700; font-size:12px; color:var(--negro); padding:4px 10px; min-height:34px; line-height:1.35; }
+
   /* ---------- Acciones (mas pequenas y estrechas, como en la referencia) ---------- */
   .actions{display:flex;flex-direction:column;align-items:center;gap:6px;gap:clamp(4px,1svh,8px);margin-top:clamp(20px,4svh,40px);}
 
@@ -212,7 +237,7 @@ if('serviceWorker' in navigator){
   .rank-full-ms { font-size:0.72rem; font-weight:900; color:#b03020; }
   .rank-full-date { font-size:0.5rem; color:#555; }
   .rank-full-empty { text-align:center; padding:24px; font-size:0.62rem; color:#ccc; letter-spacing:0.1em; }
-  #seg1R,#seg2R,#seg3R{margin-bottom:4px;}
+  #seg1R,#seg2R{margin-bottom:4px;}
   #rkList{margin-top:10px;}
   .res-quad{width:100%;height:clamp(200px,27svh,238px);display:grid;grid-template-columns:1.28fr 1fr;grid-template-rows:1.62fr 1fr;}
   .rq{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px 8px;gap:2px;min-width:0;min-height:0;}
@@ -381,7 +406,6 @@ if('serviceWorker' in navigator){
     <div class="segment" id="seg1">
       <button class="sel" data-v="def">Defensa</button>
       <button data-v="atk">Ataque</button>
-      <button data-v="cmb">Combate</button>
     </div>
 
     <div class="segment" id="seg2">
@@ -391,8 +415,8 @@ if('serviceWorker' in navigator){
     </div>
 
     <div class="segment" id="seg3">
-      <button class="sel" data-v="cont">Seguido</button>
-      <button data-v="paus">Espera</button>
+      <button data-v="cmb">Combate</button>
+      <button data-v="champ">Campeonato</button>
     </div>
 
     <div style="border:3px solid #b03020;border-radius:10px;background-color:#000000;padding:20px 12px 12px;display:flex;flex-direction:column;align-items:center;width:92%;min-height:250px;box-sizing:border-box;margin:auto auto 28px;">
@@ -443,7 +467,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v72</div>
+    <div class="app-ver">v73</div>
     </div>
 
   </main>
@@ -480,6 +504,20 @@ if('serviceWorker' in navigator){
   <div class="results-actions">
     <button class="game-ctrl-btn" onclick="show('home')">&#8592; Atr&#225;s</button>
     <button class="game-ctrl-btn" style="border-right:none;border-left:1px solid #333;" onclick="confirmMatchSetup()">Empezar</button>
+  </div>
+  </section>
+
+  <section id="bracket" class="screen">
+  <main>
+    <h1 class="title" style="font-size:1.3rem;margin-top:12px;">Campeonato</h1>
+    <div class="br-round" id="brRound"></div>
+    <div class="br-heads"><span class="qf">Cuartos</span><span class="sf">Semis</span><span class="fi">Final</span><span class="ch">Campe&#243;n</span></div>
+    <div class="br-cols" id="brCols"></div>
+    <div class="br-note" id="brNote"></div>
+  </main>
+  <div class="results-actions">
+    <button class="game-ctrl-btn" id="brBack" onclick="champBack()">&#8592; Atr&#225;s</button>
+    <button class="game-ctrl-btn" id="brGo" style="border-right:none;border-left:1px solid #333;" onclick="champGo()">Empezar</button>
   </div>
   </section>
 
@@ -587,15 +625,12 @@ if('serviceWorker' in navigator){
         <button class="rank-tab" data-v="def">Defensa</button>
         <button class="rank-tab" data-v="atk">Ataque</button>
         <button class="rank-tab" data-v="cmb">Combate</button>
+        <button class="rank-tab" data-v="champ">Campeonato</button>
       </div>
       <div class="rank-tabs" id="seg2R">
         <button class="rank-tab" data-v="10">10</button>
         <button class="rank-tab" data-v="25">25</button>
         <button class="rank-tab" data-v="50">50</button>
-      </div>
-      <div class="rank-tabs" id="seg3R">
-        <button class="rank-tab" data-v="cont">Seguido</button>
-        <button class="rank-tab" data-v="paus">Espera</button>
       </div>
       <div id="rkList" class="rank-full-list"></div>
     </div>
@@ -794,29 +829,35 @@ function setSeg(id,val){
 }
 
 /* ---------- Estado ---------- */
-var S={ s1:'a', s2:'a', s3:'a', name:'RDS', sport:'', t0:0, times:[],
+var S={ s1:'def', s2:'25', s3:'paus', name:'RDS', sport:'', t0:0, times:[],
         resAvg:NaN, resTotal:0, resEnsayos:0, saved:null,
         lastRec:null, lastRecKey:null, rankKey:null,
-        color:'aka', gender:'m', cTime:60, cStrategy:'libre' };
+        color:'aka', gender:'m', cTime:60, cStrategy:'libre', champRounds:0 };
 
 function filterInitials(el){ el.value=el.value.replace(/[^A-Za-z]/g,'').toUpperCase(); }
 
+/* Modo elegido en el inicio: Defensa/Ataque (fila de arriba) o Combate/Campeonato
+   (fila de abajo). Solo una de las dos filas tiene seleccion a la vez (segLink). */
+function homeMode(){ return selVal('seg1')||selVal('seg3')||'def'; }
+function isCombatMode(m){ return m==='cmb' || m==='champ'; }
+
 /* ---------- Arranque del ejercicio ---------- */
 function startGame(){
-  S.s1=selVal('seg1')||'a';
-  S.s2=selVal('seg2')||'a';
-  S.s3=selVal('seg3')||'a';
+  S.s1=homeMode();
+  S.s2=selVal('seg2')||'25';
+  S.s3='paus';   // Defensa y Ataque se hacen SIEMPRE en modo Espera (ya no hay Seguido)
   var nm=($('user-ini-input').value||'RDS').toUpperCase().replace(/[^A-Z]/g,'').slice(0,3);
   S.name=nm||'RDS';
   S.sport=($('user-sport-select')&&$('user-sport-select').value)||'';
   openMatchSetup();
 }
-/* ---------- Panel previo: elegir rival (aka/ao, masc/fem) y, en Combate,
-   tiempo y comportamiento del rival. Se muestra tras pulsar START, antes de
-   entrar al ejercicio. ---------- */
+/* ---------- Panel previo: elegir rival (aka/ao, masc/fem) y, en Combate y
+   Campeonato, tiempo y comportamiento del rival (Libre / Tactica). Se muestra
+   tras pulsar START, antes de entrar al ejercicio. En Campeonato lo elegido
+   (color/sexo) es para el PRIMER rival; los siguientes se derivan (champAppearance). ---------- */
 function openMatchSetup(){
-  var cmb = S.s1==='cmb';
-  $('msTitle').textContent = cmb ? 'Configura el combate' : 'Elige rival';
+  var cmb = isCombatMode(S.s1);
+  $('msTitle').textContent = S.s1==='champ' ? 'Campeonato · 1er rival' : (cmb ? 'Configura el combate' : 'Elige rival');
   $('segTime').style.display = cmb ? 'flex' : 'none';
   $('segStrategy').style.display = cmb ? 'flex' : 'none';
   setSeg('segColor', S.color);
@@ -829,16 +870,171 @@ function openMatchSetup(){
 function confirmMatchSetup(){
   S.color = selVal('segColor')||'aka';
   S.gender = selVal('segGender')||'m';
-  if(S.s1==='cmb'){
+  if(isCombatMode(S.s1)){
     S.cTime = parseInt(selVal('segTime'),10)||60;
     S.cStrategy = selVal('segStrategy')||'libre';
   }
+  primeSfx();
+  if(S.s1==='champ'){ champNew(); show('bracket'); return; }
   preloadSprites();
   applyCharHits();
-  primeSfx();
   runGame();
 }
-function repeatGame(){ runGame(); }
+function repeatGame(){
+  if(S.s1==='champ'){ champNew(true); show('bracket'); return; }   // repetir un campeonato = empezarlo de nuevo, no un solo combate
+  runGame();
+}
+/* ---------- CAMPEONATO (2026-09-21, pedido expreso) ----------
+   Cuadro de 8: cuartos -> semis -> final. El jugador (sus iniciales) es el primer hueco;
+   los 7 rivales tienen nombre editable (hasta 12 letras). Solo se juegan los combates del
+   jugador; los cruces de los demas se sortean al acabar cada ronda. Cada combate es un
+   Combate normal (Libre o Tactica, mismo tiempo) con dificultad +5 ms por ronda superada
+   (C.champPen, ver cAdaptivePenalty) y, si empata al acabar el tiempo, punto de oro.
+   Aspecto de los rivales: 1o = lo elegido (color+sexo); 2o = otro sexo y otro color;
+   3o = mismo sexo que el 2o y color distinto al del 2o (o sea, el del 1o). Los huecos del
+   cuadro se identifican por id: -1 = jugador, 0..6 = rival i (asi dos rivales con el
+   mismo nombre no se confunden). */
+var CH = null;
+var CH_ROUND_LABELS = ['Cuartos de final','Semifinal','Final'];
+var CH_DEFAULT_NAMES = ['Kenji','Aiko','Ryu','Sakura','Hiro','Mika','Taro'];
+function champLabel(id){ return id===-1 ? S.name : CH.names[id]; }
+function champPick(a,b){ return Math.random()<0.5 ? a : b; }
+function champNew(isRepeat){
+  var prev = CH;
+  CH = { names: prev ? prev.names.slice() : CH_DEFAULT_NAMES.slice(),
+         color1: (isRepeat && prev) ? prev.color1 : S.color, gender1: (isRepeat && prev) ? prev.gender1 : S.gender,
+         phase:'setup', round:0, wins:0, w1:[null,null,null,null], w2:[null,null], champ:null,
+         scores:[null,null,null], times:[], attempts:0, hits:0, totalSec:0 };
+  S.color=CH.color1; S.gender=CH.gender1;
+  champRender();
+}
+function champAppearance(round){
+  var c1=CH.color1, g1=CH.gender1;
+  var oc = c1==='aka' ? 'ao' : 'aka', og = g1==='m' ? 'f' : 'm';
+  if(round===0) return { color:c1, gender:g1 };
+  if(round===1) return { color:oc, gender:og };
+  return { color:c1, gender:og };
+}
+function champOpponentId(){ return CH.round===0 ? 0 : (CH.round===1 ? CH.w1[1] : CH.w2[1]); }
+function champStartBout(){
+  var ap=champAppearance(CH.round);
+  S.color=ap.color; S.gender=ap.gender;
+  CH.phase='running';
+  preloadSprites();
+  applyCharHits();
+  runGame();
+}
+function champResolveRound(r, won){
+  if(r===0){
+    CH.w1[0] = won ? -1 : 0;
+    CH.w1[1] = champPick(1,2); CH.w1[2] = champPick(3,4); CH.w1[3] = champPick(5,6);
+  } else if(r===1){
+    CH.w2[0] = won ? -1 : CH.w1[1];
+    CH.w2[1] = champPick(CH.w1[2], CH.w1[3]);
+  } else {
+    CH.champ = won ? -1 : CH.w2[1];
+  }
+  if(!won){   // el jugador cae: se simula el resto del cuadro para saber quien es el campeon
+    if(r===0){ CH.w2[0]=champPick(CH.w1[0],CH.w1[1]); CH.w2[1]=champPick(CH.w1[2],CH.w1[3]); }
+    if(r<=1){ CH.champ=champPick(CH.w2[0],CH.w2[1]); }
+  }
+}
+/* Llamada desde cFinishResults() al acabar un combate de Campeonato. */
+function champBoutDone(){
+  var pScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  var won = pScore>rScore;
+  CH.scores[CH.round]=[pScore,rScore];
+  for(var i=0;i<C.times.length;i++) CH.times.push(C.times[i]);
+  CH.attempts+=C.attempts; CH.hits+=C.hits;
+  CH.totalSec+=Math.max(0,(S.cTime||60)-C.timeLeft);
+  champResolveRound(CH.round, won);
+  if(won){ CH.wins++; if(CH.round<2){ CH.round++; CH.phase='between'; } else { CH.phase='over'; } }
+  else { CH.phase='over'; }
+  champRender();
+  show('bracket');
+}
+function champRender(){
+  var box=$('brCols'); if(!box || !CH) return;
+  var edit = CH.phase==='setup';
+  function res(id, winner){ return winner==null ? '' : (id===winner ? ' win' : ' lose'); }
+  function slot(id, extra){
+    var me = id===-1 ? ' me' : '';
+    if(edit && id>=0){
+      return '<input class="br-slot" data-i="'+id+'" maxlength="12" value="'+esc(CH.names[id])+'" placeholder="Rival" autocomplete="off" autocapitalize="words" spellcheck="false">';
+    }
+    return '<div class="br-slot'+me+(extra||'')+'">'+esc(champLabel(id))+'</div>';
+  }
+  function tbd(){ return '<div class="br-slot tbd">&mdash;</div>'; }
+  function match(a,b){ return '<div class="br-match">'+a+b+'</div>'; }
+  var qf=[-1,0,1,2,3,4,5,6], h='', m, k;
+  h+='<div class="br-col qf">';
+  for(m=0;m<4;m++) h+=match(slot(qf[2*m], res(qf[2*m], CH.w1[m])), slot(qf[2*m+1], res(qf[2*m+1], CH.w1[m])));
+  h+='</div><div class="br-col sf">';
+  for(m=0;m<2;m++){
+    var a=CH.w1[2*m], b=CH.w1[2*m+1];
+    h+=match(a==null?tbd():slot(a, res(a, CH.w2[m])), b==null?tbd():slot(b, res(b, CH.w2[m])));
+  }
+  h+='</div><div class="br-col fi">';
+  var f0=CH.w2[0], f1=CH.w2[1];
+  h+=match(f0==null?tbd():slot(f0, res(f0, CH.champ)), f1==null?tbd():slot(f1, res(f1, CH.champ)));
+  h+='</div><div class="br-col ch">';
+  h+= CH.champ==null ? tbd() : '<div class="br-slot champ">'+esc(champLabel(CH.champ))+'</div>';
+  h+='</div>';
+  box.innerHTML=h;
+  var round = Math.min(CH.round,2), note='', go='Empezar', back='← Atrás';
+  $('brRound').textContent = CH.phase==='over' ? 'Campeonato terminado' : CH_ROUND_LABELS[round];
+  if(CH.phase==='setup'){
+    note='Toca un nombre para editar a tus rivales. Tú eres <b>'+esc(S.name)+'</b>. Empiezas contra <b>'+esc(CH.names[0])+'</b>.';
+  } else if(CH.phase==='between'){
+    var prev=CH.round-1, sc=CH.scores[prev];
+    note=CH_ROUND_LABELS[prev]+': ganaste '+sc[0]+'-'+sc[1]+'. Siguiente: '+CH_ROUND_LABELS[CH.round].toLowerCase()+' contra <b>'+esc(champLabel(champOpponentId()))+'</b>.';
+    go='Siguiente combate'; back='← Inicio';
+  } else if(CH.phase==='over'){
+    var sc2=CH.scores[CH.wins>=3?2:CH.wins];
+    note = CH.wins>=3 ? '¡Campeón! Ganaste la final '+sc2[0]+'-'+sc2[1]+'.'
+                      : CH_ROUND_LABELS[CH.wins]+': perdiste '+sc2[0]+'-'+sc2[1]+'. Campeón: <b>'+esc(champLabel(CH.champ))+'</b>.';
+    go='Ver resultado'; back='← Inicio';
+  }
+  $('brNote').innerHTML=note;
+  $('brGo').textContent=go; $('brBack').textContent=back;
+}
+function champSanitizeName(v){ return String(v).replace(/[^A-Za-zÀ-ÿ ]/g,'').replace(/\s{2,}/g,' ').slice(0,12); }
+function champGo(){
+  if(!CH) return;
+  if(CH.phase==='setup'){
+    for(var i=0;i<7;i++){ CH.names[i]=champSanitizeName(CH.names[i]).trim() || CH_DEFAULT_NAMES[i]; }
+    return champStartBout();
+  }
+  if(CH.phase==='over') return champShowResult();
+  champStartBout();
+}
+function champBack(){
+  if(CH && CH.phase==='setup'){ openMatchSetup(); return; }
+  goHome();
+}
+function champShowResult(){
+  var n=CH.times.length, sum=0, best=Infinity, i;
+  for(i=0;i<n;i++){ sum+=CH.times[i]; if(CH.times[i]<best) best=CH.times[i]; }
+  var avg = n?sum/n:0;
+  S.resAvg=avg; S.resTotal=CH.totalSec*1000; S.resEnsayos=n; S.saved=false; S.champRounds=CH.wins;
+  $('resMsg').style.display='none'; $('resEns').style.display='none';
+  $('rK2').textContent='Resultado';
+  var rv2=$('rV2'); rv2.textContent=CH_ROUND_NAMES[CH.wins]; rv2.style.fontSize='24px';
+  $('rV1').textContent=Math.round(avg);
+  $('rV3').textContent=(CH.attempts?Math.round(CH.hits/CH.attempts*100):0)+'%';
+  $('rV4').textContent=(best===Infinity?'--':Math.round(best));
+  renderChart(CH.times);
+  var gb=$('btnGuardar'); if(gb){ gb.disabled=false; gb.textContent='Guardar resultado'; }
+  showSaveScreen();
+}
+$('brCols').addEventListener('input', function(e){
+  var el=e.target; if(!el || el.tagName!=='INPUT' || !CH) return;
+  var clean=champSanitizeName(el.value);
+  if(clean!==el.value) el.value=clean;
+  CH.names[parseInt(el.getAttribute('data-i'),10)]=clean;
+});
+
 function runGame(){
   show('game');
   if(typeof kStart==='function') kStart();
@@ -901,6 +1097,7 @@ function finish(){
   /* Quad de Reaction Karate: Media ms | Defendidas x/N | % acierto | Mejor ms */
   var kDef=(S.kDef!=null?S.kDef:0), kTot=(S.kTotal!=null?S.kTotal:c.n);
   var rk2=$('rK2'); if(rk2) rk2.textContent = (S.s1==='atk') ? 'Atacadas' : 'Defendidas';
+  $('rV2').style.fontSize='';
   $('rV1').textContent=Math.round(c.avg);
   $('rV2').textContent=kDef+'/'+kTot;
   $('rV3').textContent=(kTot?Math.round(kDef/kTot*100):0)+'%';
@@ -914,20 +1111,28 @@ function finish(){
 /* ---------- Ranking: clave local + Firebase ---------- */
 function lbKey(a,b,c){ return 'rds_rkarate_'+a+'_'+b+'_'+c; }
 function loadLb(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } }
-function sortLb(lb){ lb.sort(function(a,b){ return MENOR_ES_MEJOR ? (a.avg-b.avg) : (b.avg-a.avg); }); }
-/* Combate no usa repeticiones/ritmo (seg2/seg3 del home quedan sin sentido
-   ahí, ver applyModeUI) -- su categoría real de ranking es tiempo+estrategia
-   (S.cTime/S.cStrategy, elegidos en "Configura el combate"). Defensa/Ataque
-   siguen usando S.s2/S.s3 tal cual (2026-09-14, pedido expreso: Combate
-   también tiene Guardar/Ranking). */
+/* Campeonato: manda la ronda alcanzada (rec.rounds: 0 cuartos ... 3 campeon) y, a igualdad,
+   la media de reaccion; el resto de categorias no tienen rounds y ordenan solo por media. */
+function sortLb(lb){ lb.sort(function(a,b){
+  var ra=a.rounds||0, rb=b.rounds||0;
+  if(ra!==rb) return rb-ra;
+  return MENOR_ES_MEJOR ? (a.avg-b.avg) : (b.avg-a.avg);
+}); }
+var CH_ROUND_NAMES = ['Cuartos','Semis','Final','Campeón'];
+/* Combate y Campeonato no usan repeticiones (seg2 del home queda sin sentido
+   ahí) -- su categoría real de ranking es tiempo+estrategia (S.cTime/S.cStrategy,
+   elegidos en "Configura el combate"). Defensa/Ataque usan S.s2 y siempre 'paus'
+   (ya no existe Seguido; los marcadores antiguos de Seguido quedan guardados pero
+   ya no se pueden consultar). */
 function curKeyParts(){
-  return S.s1==='cmb' ? [S.s1, String(S.cTime||60), (S.cStrategy||'libre')] : [S.s1, S.s2, S.s3];
+  return isCombatMode(S.s1) ? [S.s1, String(S.cTime||60), (S.cStrategy||'libre')] : [S.s1, S.s2, 'paus'];
 }
 
 function saveScore(avg,total){
   var nm = S.sport ? (S.name+'-'+S.sport) : S.name;
   var kp = curKeyParts();
   var rec={ s1:kp[0], s2:kp[1], s3:kp[2], name:nm, ensayos:S.resEnsayos, avg:Math.round(avg), tt:Math.round(total), ts:Date.now() };
+  if(S.s1==='champ') rec.rounds=S.champRounds||0;
   var k=lbKey(kp[0],kp[1],kp[2]), lb=loadLb(k);
   lb.push(rec); sortLb(lb); lb=lb.slice(0,50);
   try{ localStorage.setItem(k,JSON.stringify(lb)); }catch(e){}
@@ -965,6 +1170,7 @@ function renderRankList(list, el, latest){
   list=filterRepeated(list);
   function rankBetter(a,b){
     if(a==null) return false; if(b==null) return true;
+    if((a.rounds||0)!==(b.rounds||0)) return (a.rounds||0)>(b.rounds||0);
     var far=MENOR_ES_MEJOR?9999999:-9999999;
     var av=(a.avg==null?far:a.avg), bv=(b.avg==null?far:b.avg);
     return MENOR_ES_MEJOR ? av<bv : av>bv;
@@ -990,7 +1196,7 @@ function renderRankList(list, el, latest){
     pos.textContent=posLabel;
     var nm=document.createElement('div');nm.className='rank-full-name';nm.textContent=entry.name;
     var ms=document.createElement('div');ms.className='rank-full-ms';
-    ms.textContent=entry.avg+' '+UNIDAD;
+    ms.textContent=(entry.rounds!=null ? CH_ROUND_NAMES[Math.max(0,Math.min(3,entry.rounds))]+' · ' : '')+entry.avg+' '+UNIDAD;
     var dt=document.createElement('div');dt.className='rank-full-date';dt.textContent=entry.ts?fmtDate(entry.ts):'';
     row.appendChild(pos);row.appendChild(nm);row.appendChild(ms);row.appendChild(dt);
     return row;
@@ -1017,19 +1223,17 @@ function renderRankList(list, el, latest){
   }
 }
 
-/* seg2R/seg3R (10/25/50, Seguido/Espera) no significan nada para Combate
-   (ranking por tiempo+estrategia, ver curKeyParts) -- se ocultan y se
-   sustituyen por S.cTime/S.cStrategy en vez de leerlos. */
+/* seg2R (10/25/50) no significa nada para Combate ni Campeonato (ranking por
+   tiempo+estrategia, ver curKeyParts) -- se oculta y se sustituye por
+   S.cTime/S.cStrategy en vez de leerlo. Defensa/Ataque: tercer campo siempre 'paus'. */
 function updateRankFilterVis(v1){
-  var isCmb = v1==='cmb';
-  $('seg2R').style.display = isCmb ? 'none' : 'flex';
-  $('seg3R').style.display = isCmb ? 'none' : 'flex';
+  $('seg2R').style.display = isCombatMode(v1) ? 'none' : 'flex';
 }
 function rankV2V3(v1){
-  return v1==='cmb' ? [String(S.cTime||60), (S.cStrategy||'libre')] : [selVal('seg2R')||'a', selVal('seg3R')||'a'];
+  return isCombatMode(v1) ? [String(S.cTime||60), (S.cStrategy||'libre')] : [selVal('seg2R')||'25', 'paus'];
 }
 function rankFromSel(){
-  var v1 = selVal('seg1R')||'a';
+  var v1 = selVal('seg1R')||'def';
   updateRankFilterVis(v1);
   var v23 = rankV2V3(v1);
   renderRank(v1, v23[0], v23[1]);
@@ -1060,12 +1264,11 @@ function showRanking(){
   var btn=document.getElementById('btn-hide-repeated');
   if(btn) btn.textContent='Mostrar repetidos';
   updateRankSaveBtn();
-  var v1=selVal('seg1')||'a';
+  var v1=homeMode();
   setSeg('seg1R',v1);
   updateRankFilterVis(v1);
-  var v23;
-  if(v1==='cmb'){ v23=[String(S.cTime||60), (S.cStrategy||'libre')]; }
-  else { v23=[selVal('seg2')||'a', selVal('seg3')||'a']; setSeg('seg2R',v23[0]); setSeg('seg3R',v23[1]); }
+  var v23=rankV2V3(v1);
+  if(!isCombatMode(v1)){ v23=[selVal('seg2')||'25','paus']; setSeg('seg2R',v23[0]); }
   renderRank(v1,v23[0],v23[1]); show('ranking');
 }
 function renderRank(v1,v2,v3){
@@ -1075,6 +1278,7 @@ function renderRank(v1,v2,v3){
   var kp=curKeyParts();
   if(S.saved===false && isFinite(S.resAvg) && lbKey(kp[0],kp[1],kp[2])===key){
     latest={ name:(S.sport?(S.name+'-'+S.sport):S.name), avg:Math.round(S.resAvg), ensayos:S.resEnsayos, ts:Date.now() };
+    if(S.s1==='champ') latest.rounds=S.champRounds||0;
   } else if(S.lastRec && S.lastRecKey===key){
     latest=S.lastRec;
   }
@@ -1093,25 +1297,25 @@ function renderRank(v1,v2,v3){
 
 function goHome(){ show('home'); }
 
-/* ---------- Modo Combate: adapta seg2 (reps->minutos) y seg3 (fuerza Espera) ---------- */
-function applyModeUI(mode){
-  /* seg2 (10/25/50) ya NO cambia a minutos en Combate: el tiempo de combate
-     se elige en el panel "Configura el combate" (segTime) tras pulsar START. */
-  var contBtn = $('seg3').querySelector('[data-v="cont"]');
-  if(mode==='cmb'){ contBtn.disabled=true; setSeg('seg3','paus'); }
-  else{ contBtn.disabled=false; }
+/* Las filas seg1 (Defensa/Ataque) y seg3 (Combate/Campeonato) son UN solo selector:
+   al elegir en una se deselecciona la otra. seg2 (10/25/50) solo cuenta en Defensa/Ataque;
+   el tiempo de Combate/Campeonato se elige en el panel "Configura..." tras pulsar START. */
+function segLink(a,b){
+  [[a,b],[b,a]].forEach(function(p){
+    $(p[0]).addEventListener('click', function(e){
+      if(!e.target.closest('button')) return;
+      var others=$(p[1]).querySelectorAll('button');
+      for(var i=0;i<others.length;i++) others[i].classList.remove('sel');
+    });
+  });
 }
-$('seg1').addEventListener('click', function(e){
-  var b=e.target.closest('button'); if(!b) return;
-  applyModeUI(b.getAttribute('data-v'));
-});
 
 /* ---------- Wiring ---------- */
-seg('seg1'); seg('seg2'); seg('seg3');
+seg('seg1'); seg('seg2'); seg('seg3'); segLink('seg1','seg3');
 seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
 $('segColor').addEventListener('click', updateMsRivalPreview);
 $('segGender').addEventListener('click', updateMsRivalPreview);
-segRank('seg1R'); segRank('seg2R'); segRank('seg3R');
+segRank('seg1R'); segRank('seg2R');
 $('btnRank2').addEventListener('click', showRanking);
 $('btnGuardar').addEventListener('click', function(){
   if(S.saved) return;
@@ -1332,14 +1536,20 @@ var C_WIN_FEINT_DEFEND = 500; // ms para defender la técnica DEFINITIVA de un "
    propia como la de los planes A/B que hubo hasta el 2026-09-14) -- por
    eso "hasta que empate" no hace falta código aparte: en cuanto la
    diferencia baja de 2, el ajuste desaparece solo. */
+/* CAMPEONATO (2026-09-21, pedido expreso): los cuartos usan los valores normales de
+   Combate; las semis son 5 ms mas dificiles EN TODO y la final otros 5 ms (C.champPen =
+   5 * ronda, fijado en cStart). Se suma aqui, asi cubre parar/contraatacar/pique/amago
+   rival/barrido a la vez, y tambien la ventana del boton Ataque (cWinAtkBtn). */
 function cAdaptivePenalty(){
   var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
   var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
   var lead = playerScore - rivalScore;
-  if(lead>=2) return 10*(lead-1);
-  if(lead<=-2) return -10*(-lead-1);
-  return 0;
+  var adaptive = 0;
+  if(lead>=2) adaptive = 10*(lead-1);
+  else if(lead<=-2) adaptive = -10*(-lead-1);
+  return adaptive + (C.champPen||0);
 }
+function cWinAtkBtn(){ return C_WIN_ATK_BTN - (C.champPen||0); }
 function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
 
 /* ---- Táctica de Combate (Plan A/B/C, 2026-09-13) ----
@@ -1544,8 +1754,7 @@ applyCharHits();
    1:1 con las nuevas -- asumido a propósito, a diferencia de processing
    (ver rds-processing-test, mismo día: ahí se decidió NO aplicarlo). */
 var DISPLAY_CORRECTION = 30;
-var K_WINDOW_CONT = 475; // ms para llegar a defender/atacar en "Seguido" (-50ms, 2026-09-17, pedido expreso)
-var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar en "Espera" (-50ms, 2026-09-17, pedido expreso)
+var K_WINDOW_PAUS = 500; // ms para llegar a defender/atacar (modo Espera, el unico que queda: se quito Seguido 2026-09-21) (-50ms, 2026-09-17, pedido expreso)
 var K_ATK_EXTRA = 0; // Ataque ya NO es más difícil que Defensa -- quitado 2026-09-17, pedido expreso (antes 25ms)
 var K_GRACE  = 320;   // margen antes del punto automático
 /* Radio de acierto (px) alrededor del centro de la diana (.k-ring, 58px de
@@ -1556,12 +1765,12 @@ var K_GRACE  = 320;   // margen antes del punto automático
 var K_HIT_RADIUS = 29;
 function kWindow(){
   if(K.tech && K.tech.s==='sweep_low') return K_SWEEP_WINDOW;
-  var base = K.pace==='paus' ? K_WINDOW_PAUS : K_WINDOW_CONT;
+  var base = K_WINDOW_PAUS;
   if(kMode()==='atk'){ base -= K_ATK_EXTRA; }
   return base + (K.tech && K.tech.winBonus || 0);
 }
 
-var K = { state:'idle', timer:0, rep:0, total:0, pace:'cont', def:0, pt:0, tech:null, mirror:false, t0:0 };
+var K = { state:'idle', timer:0, rep:0, total:0, pace:'paus', def:0, pt:0, tech:null, mirror:false, t0:0 };
 var kStage, kKata, kRing, kMark, kStatus;
 
 function kEls(){
@@ -1617,7 +1826,7 @@ function kStart(){
   kStage.classList.toggle('cmb-mode', cmb);
   if(cmb){ cStart(); return; }
   K.total = parseInt(selVal('seg2'),10)||25;
-  K.pace  = selVal('seg3')||'cont';
+  K.pace  = 'paus';   // Defensa y Ataque siempre en modo Espera
   K.rep=0; K.def=0; K.pt=0; K.state='idle';
   S.times=[]; S.kDef=0; S.kTotal=K.total;
   /* Los contadores del HUD deben pintarse del color real de "yo"/"rival"
@@ -1721,7 +1930,7 @@ function kAttempt(){
   K.state='ready';
   K.timer=setTimeout(kFire, lo+Math.random()*(hi-lo));
 }
-function kMode(){ return S.s1==='atk' ? 'atk' : (S.s1==='cmb' ? 'cmb' : 'def'); }
+function kMode(){ return S.s1==='atk' ? 'atk' : (isCombatMode(S.s1) ? 'cmb' : 'def'); }
 function kFire(){
   var atk = kMode()==='atk';
   if(atk){
@@ -1831,6 +2040,8 @@ function cStart(){
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
   C.atkBtnUsed=0; C.atkBtnTotal=Math.round(C.timeLeft/60)*C_ATK_BTN_PER_MIN;
   C.times=[]; C.attempts=0; C.hits=0;
+  C.golden=false;
+  C.champPen = (S.s1==='champ' && CH) ? 5*CH.round : 0;   // Campeonato: +5 ms de dificultad por ronda superada
   /* Botones/pips de Amago y Ataque en el color del JUGADOR (aka=rojo/
      ao=azul), pedido expreso 2026-09-14 (Amago) / 2026-09-16 (Ataque) --
      se sortea junto con C.akaSide arriba. */
@@ -2216,13 +2427,13 @@ function cAtkStart(){
   // El rival decide en secreto qué zona va a tapar a los C_WIN_ATK_BTN ms -- 70% cabeza, 30% repartido entre las otras dos zonas reales.
   C.atkRivalZone = Math.random()<0.7 ? 'cabeza' : (Math.random()<0.5 ? 'torso' : 'costado_izq');
   C.t0 = performance.now();
-  C.timer=setTimeout(function(){ cResolveAtkBtn(null); }, C_WIN_ATK_BTN+K_GRACE);
+  C.timer=setTimeout(function(){ cResolveAtkBtn(null); }, cWinAtkBtn()+K_GRACE);
   // Movimiento de bloqueo VISIBLE justo al cerrarse la ventana -- si para entonces ya resolví
   // (toqué antes), esto ni se llega a mostrar: gané la carrera antes de que se vea el bloqueo.
   C.guardUpTimer = setTimeout(function(){
     if(C.state!=='atk_btn_aim') return;
     cShowPose(C_ATK_ZONE_POSE[C.atkRivalZone], null, C.mirror);
-  }, C_WIN_ATK_BTN);
+  }, cWinAtkBtn());
 }
 function cResolveAtkBtn(tap){
   if(C.state!=='atk_btn_aim') return;
@@ -2243,7 +2454,7 @@ function cResolveAtkBtn(tap){
   var landed;
   if(!myZone){ landed=false; } // no toqué a tiempo, o toqué fuera de cualquier zona real
   else if(myZone!==C.atkRivalZone){ landed=true; } // el rival tapaba otro sitio: entra siempre, aunque llegue tarde
-  else { landed = tap.dt<=C_WIN_ATK_BTN; } // mismo sitio: solo si llego antes de que tape
+  else { landed = tap.dt<=cWinAtkBtn(); } // mismo sitio: solo si llego antes de que tape
   if(landed){ sndPunch(); return cAwardPoint('player','yuko'); }
   if(Math.random()<C_ATK_BTN_COUNTER_P){ return cBeginAttack(); } // fallo -> 1/3 de que el rival contraataque de verdad
   C.timer=setTimeout(cParado, 500);
@@ -2269,7 +2480,7 @@ function cAwardPoint(side, value){
   cShowFlagColor(color);
   kSetStatus((C_TERM[value]||value)+' de '+(color==='aka'?'Aka':'Ao'), color==='aka'?'point':'pointao');
   var diff = Math.abs(C.scoreAka - C.scoreAo);
-  if(diff>=8){ C.timer=setTimeout(function(){ cEndMatch('diff'); }, 1400); return; }
+  if(diff>=8 || C.golden){ C.timer=setTimeout(function(){ cEndMatch('diff'); }, 1400); return; }   // C.golden: el primer punto tras el empate decide
   /* Combate parado 2s tras el punto (2026-09-14, pedido expreso): la
      bandera se ve los 2s enteros (cShowFlagColor), el rival saluda solo
      durante el 2º segundo, y al llegar a los 2s silbato + reanuda
@@ -2284,7 +2495,16 @@ function cAwardPoint(side, value){
   }, 1000);
 }
 var PLAN_LABELS = { a:'A- Ataque', b:'B- Defensa', c:'C- Provocación' };
-function cEndMatch(){
+/* Campeonato: un empate al acabar el tiempo se decide por PUNTO DE ORO -- el combate sigue
+   sin reloj y el primero que puntua gana (cAwardPoint cierra el combate en cuanto hay
+   un punto con C.golden activo). */
+function cGoldenPoint(){
+  C.golden=true;
+  clearInterval(C.timerId);
+  var el=$('cTimer'); el.textContent='ORO'; el.classList.add('low');
+}
+function cEndMatch(reason){
+  if(reason==='time' && S.s1==='champ' && !C.golden && C.scoreAka===C.scoreAo){ cGoldenPoint(); return; }
   C.active=false; C.paused=true;
   clearInterval(C.timerId); clearTimeout(C.timer);
   $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
@@ -2302,12 +2522,14 @@ function cShowMatchEndBanner(){
    (cTrackAttempt(), ver arriba: solo parar el ataque real del rival,
    2026-09-14/15, pedido expreso). */
 function cFinishResults(){
+  if(S.s1==='champ'){ champBoutDone(); return; }   // en Campeonato el combate acaba en el cuadro, no en Resultado
   var n=C.times.length, sum=0, best=Infinity, i;
   for(i=0;i<n;i++){ sum+=C.times[i]; if(C.times[i]<best) best=C.times[i]; }
   var avg = n?sum/n:0;
   var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
   var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
   $('resMsg').style.display='none'; $('resEns').style.display='none';
+  $('rV2').style.fontSize='';
   var rk2=$('rK2'); if(rk2) rk2.textContent='Puntos';
   $('rV1').textContent=Math.round(avg);
   $('rV2').textContent=playerScore+'-'+rivalScore;
