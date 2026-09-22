@@ -467,7 +467,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v73</div>
+    <div class="app-ver">v75</div>
     </div>
 
   </main>
@@ -1549,6 +1549,14 @@ function cAdaptivePenalty(){
   else if(lead<=-2) adaptive = -10*(-lead-1);
   return adaptive + (C.champPen||0);
 }
+/* Ippon de remontada (2026-09-21, pedido expreso): si el rival me saca 3 puntos o
+   mas, mis aciertos valen ippon -- pique del Amago, boton Ataque y contraataque
+   tras parar un ippon del rival. Un unico sitio para el umbral. */
+function cRivalLeads3(){
+  var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
+  var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
+  return rivalScore - playerScore >= 3;
+}
 function cWinAtkBtn(){ return C_WIN_ATK_BTN - (C.champPen||0); }
 function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
 
@@ -1621,8 +1629,10 @@ var C_GUARD_POSES = ['guard_chest','guard_flank','guard_temple','guard_low','blo
    por sí solo, pero no evita que el rival encadene ippons con patadas si
    no se reparte también la frecuencia de técnicas. */
 var C_ATK_WEIGHTS = { atk_jab:2, atk_cross:2, atk_combo:2, kick_front:1, kick_mid:1, kick_high:1, knee:1, kick_low:1, sweep_low:1 };
-function cPickTech(excludeName){
-  var keys = K_POOL.filter(function(k){ return k!==excludeName; });
+function cPickTech(exclude){
+  var ex = !exclude ? [] : (Array.isArray(exclude) ? exclude : [exclude]);
+  var keys = K_POOL.filter(function(k){ return ex.indexOf(k)===-1; });
+  if(!keys.length) keys = K_POOL.slice();   // salvaguarda: si se excluyera todo el pool, no debe quedarse sin tecnica
   var total=0; keys.forEach(function(k){ total += (C_ATK_WEIGHTS[k]||1); });
   var r=Math.random()*total, acc=0;
   for(var i=0;i<keys.length;i++){ acc += (C_ATK_WEIGHTS[keys[i]]||1); if(r<acc) return keys[i]; }
@@ -2001,7 +2011,7 @@ function kFinish(){
 var C = { active:false, akaSide:'rival', scoreAka:0, scoreAo:0, timeLeft:0,
           timerId:0, paused:true, state:'idle', pending:null, mirror:false, t0:0, timer:0,
           amagoUsed:0, amagoTotal:0, plan:null, planQueue:null, guardUpTimer:0,
-          atkBtnUsed:0, atkBtnTotal:0, atkRivalZone:null,
+          atkBtnUsed:0, atkBtnTotal:0, atkRivalZone:null, lastTechName:null,
           times:[], attempts:0, hits:0 };
 /* Un "intento" = SOLO parar un ataque real del rival (cResolveAttack,
    incluido el golpe real de un "amago rival") -- alimenta la pantalla de
@@ -2040,6 +2050,7 @@ function cStart(){
   C.amagoUsed=0; C.amagoTotal=Math.round(C.timeLeft/60)*C_AMAGOS_PER_MIN;
   C.atkBtnUsed=0; C.atkBtnTotal=Math.round(C.timeLeft/60)*C_ATK_BTN_PER_MIN;
   C.times=[]; C.attempts=0; C.hits=0;
+  C.lastTechName=null;
   C.golden=false;
   C.champPen = (S.s1==='champ' && CH) ? 5*CH.round : 0;   // Campeonato: +5 ms de dificultad por ronda superada
   /* Botones/pips de Amago y Ataque en el color del JUGADOR (aka=rojo/
@@ -2192,8 +2203,8 @@ function cBeginFeintAttack(){
   clearTimeout(C.timer);
   $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   C.state='rival_feint';
-  var fakeName = cPickTech();
-  var realName = cPickTech(fakeName);
+  var fakeName = cPickTech(C.lastTechName);
+  var realName = cPickTech([fakeName, C.lastTechName]);
   C.mirror = Math.random()<0.5;
   cShowPose(fakeName, null, C.mirror);
   sndWhooshMove(); // técnica FALSA del amago -- whoosh, no kiai (no es una técnica real)
@@ -2201,6 +2212,7 @@ function cBeginFeintAttack(){
   C.timer=setTimeout(function(){
     if(C.state!=='rival_feint') return;
     C.state='rival_attack';
+    C.lastTechName = realName;   // no se repite la misma técnica real dos veces seguidas
     K.tech = { s:realName, hx:K_HITS[realName][0], hy:K_HITS[realName][1], name:K_NAMES[realName], sc:(K_SC[realName]||1), winBonus:0, isFeintReal:true };
     C.pending = K.tech;
     cShowPose(K.tech.s, K.tech, C.mirror);
@@ -2217,7 +2229,8 @@ function cBeginAttack(){
   clearTimeout(C.timer);
   C.state='rival_attack';
   $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
-  var name = cPickTech();
+  var name = cPickTech(C.lastTechName);   // nunca la misma tecnica real que la anterior, para que se note el cambio
+  C.lastTechName = name;
   K.tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
   C.pending = K.tech;
   C.mirror = Math.random()<0.5;
@@ -2259,9 +2272,7 @@ function cResolveCounter(tap){
     // No aplica a waza-ari, que sigue con su valor de contraataque normal.
     var counterValue;
     if(C_VALUES[C.pending.s]==='ippon'){
-      var rivalScore = C.akaSide==='player' ? C.scoreAo : C.scoreAka;
-      var playerScore = C.akaSide==='player' ? C.scoreAka : C.scoreAo;
-      counterValue = (rivalScore - playerScore >= 3) ? 'ippon' : 'yuko';
+      counterValue = cRivalLeads3() ? 'ippon' : 'yuko';
     } else {
       counterValue = C_COUNTER_VALUES[C.pending.s]||'yuko';
     }
@@ -2376,7 +2387,7 @@ function cResolvePico(tap){
   if(C.state!=='pico_window') return;
   clearTimeout(C.timer); clearTimeout(C.guardUpTimer);
   var hit=C.pending.hit;
-  var picoValue = C_PICO_VALUES[C.pending.pose]||'yuko';
+  var picoValue = cRivalLeads3() ? 'ippon' : (C_PICO_VALUES[C.pending.pose]||'yuko');
   if(hit){
     var ok = tap && tap.onTarget && tap.dt<=cWinPico();
     if(ok){ C.state='done'; sndPunch(); return cAwardPoint('player', picoValue); }
@@ -2455,7 +2466,7 @@ function cResolveAtkBtn(tap){
   if(!myZone){ landed=false; } // no toqué a tiempo, o toqué fuera de cualquier zona real
   else if(myZone!==C.atkRivalZone){ landed=true; } // el rival tapaba otro sitio: entra siempre, aunque llegue tarde
   else { landed = tap.dt<=cWinAtkBtn(); } // mismo sitio: solo si llego antes de que tape
-  if(landed){ sndPunch(); return cAwardPoint('player','yuko'); }
+  if(landed){ sndPunch(); return cAwardPoint('player', cRivalLeads3() ? 'ippon' : 'yuko'); }
   if(Math.random()<C_ATK_BTN_COUNTER_P){ return cBeginAttack(); } // fallo -> 1/3 de que el rival contraataque de verdad
   C.timer=setTimeout(cParado, 500);
 }
