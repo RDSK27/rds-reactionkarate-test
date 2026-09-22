@@ -467,7 +467,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v75</div>
+    <div class="app-ver">v76</div>
     </div>
 
   </main>
@@ -631,6 +631,11 @@ if('serviceWorker' in navigator){
         <button class="rank-tab" data-v="10">10</button>
         <button class="rank-tab" data-v="25">25</button>
         <button class="rank-tab" data-v="50">50</button>
+      </div>
+      <div class="rank-tabs" id="seg2RTime" style="display:none;">
+        <button class="rank-tab" data-v="60">1 MIN</button>
+        <button class="rank-tab" data-v="120">2 MIN</button>
+        <button class="rank-tab" data-v="180">3 MIN</button>
       </div>
       <div id="rkList" class="rank-full-list"></div>
     </div>
@@ -1102,7 +1107,7 @@ function finish(){
   $('rV2').textContent=kDef+'/'+kTot;
   $('rV3').textContent=(kTot?Math.round(kDef/kTot*100):0)+'%';
   $('rV4').textContent=(c.best?Math.round(c.best):'--');
-  S.resAvg=c.avg; S.resTotal=total; S.resEnsayos=c.n; S.saved=false;
+  S.resAvg=c.avg; S.resTotal=total; S.resEnsayos=c.n; S.resKDef=kDef; S.saved=false;
   renderChart(S.times);
   var gb=$('btnGuardar'); if(gb){ gb.disabled=false; gb.textContent='Guardar resultado'; }
   showSaveScreen();
@@ -1111,13 +1116,53 @@ function finish(){
 /* ---------- Ranking: clave local + Firebase ---------- */
 function lbKey(a,b,c){ return 'rds_rkarate_'+a+'_'+b+'_'+c; }
 function loadLb(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } }
-/* Campeonato: manda la ronda alcanzada (rec.rounds: 0 cuartos ... 3 campeon) y, a igualdad,
-   la media de reaccion; el resto de categorias no tienen rounds y ordenan solo por media. */
-function sortLb(lb){ lb.sort(function(a,b){
-  var ra=a.rounds||0, rb=b.rounds||0;
+/* Orden del ranking, DISTINTO por categoria (2026-09-22, pedido expreso):
+   - Campeonato: ronda alcanzada (rec.rounds) desc, a igualdad media de reaccion asc.
+   - Defensa/Ataque: cantidad de aciertos (rec.def: defensas o ataques acertados,
+     segun s1) desc, a igualdad media de reaccion asc.
+   - Combate: primero VICTORIAS, luego EMPATES, luego DERROTAS (cTier); dentro de
+     cada tramo, diferencia de puntos (mios-rival) desc -- "los 8 a 0 van primero,
+     pero si hay un 10-2 (misma diferencia, mas puntos hechos) va POR DELANTE del
+     8-0" -- luego puntos propios desc como segundo desempate de la diferencia, y
+     por ultimo media de reaccion asc. Se aplica igual dentro de empates/derrotas
+     por coherencia (mismo criterio, no solo victorias). */
+function cTier(rec){
+  var d=(rec.score||0)-(rec.rivalScore||0);
+  return d>0 ? 0 : (d===0 ? 1 : 2);   // 0=victoria, 1=empate, 2=derrota
+}
+/* Comparador compartido por sortLb() y renderRankList() (rankBetter) -- un
+   unico sitio para el criterio de cada categoria, para que el orden de la
+   lista y la posicion calculada para "tu ultimo resultado" sean coherentes. */
+function rankCompare(a,b,mode){
+  var m = mode || (a && a.s1) || (b && b.s1) || '';
+  if(m==='def' || m==='atk'){
+    var da=(a&&a.def)||0, db=(b&&b.def)||0;
+    if(da!==db) return db-da;
+    var aAvg=(a&&a.avg!=null)?a.avg:(MENOR_ES_MEJOR?9999999:-9999999);
+    var bAvg=(b&&b.avg!=null)?b.avg:(MENOR_ES_MEJOR?9999999:-9999999);
+    return MENOR_ES_MEJOR ? (aAvg-bAvg) : (bAvg-aAvg);
+  }
+  if(m==='cmb'){
+    var ta=cTier(a||{}), tb=cTier(b||{});
+    if(ta!==tb) return ta-tb;
+    var dfa=((a&&a.score)||0)-((a&&a.rivalScore)||0), dfb=((b&&b.score)||0)-((b&&b.rivalScore)||0);
+    if(dfa!==dfb) return dfb-dfa;
+    var sa=(a&&a.score)||0, sb=(b&&b.score)||0;
+    if(sa!==sb) return sb-sa;
+    var aAvg2=(a&&a.avg!=null)?a.avg:(MENOR_ES_MEJOR?9999999:-9999999);
+    var bAvg2=(b&&b.avg!=null)?b.avg:(MENOR_ES_MEJOR?9999999:-9999999);
+    return MENOR_ES_MEJOR ? (aAvg2-bAvg2) : (bAvg2-aAvg2);
+  }
+  // champ (y cualquier otro caso): ronda desc, luego media
+  var ra=(a&&a.rounds)||0, rb=(b&&b.rounds)||0;
   if(ra!==rb) return rb-ra;
-  return MENOR_ES_MEJOR ? (a.avg-b.avg) : (b.avg-a.avg);
-}); }
+  var far=MENOR_ES_MEJOR?9999999:-9999999;
+  var av=(a&&a.avg!=null)?a.avg:far, bv=(b&&b.avg!=null)?b.avg:far;
+  return MENOR_ES_MEJOR ? (av-bv) : (bv-av);
+}
+function sortLb(lb, mode){
+  lb.sort(function(a,b){ return rankCompare(a,b,mode); });
+}
 var CH_ROUND_NAMES = ['Cuartos','Semis','Final','Campeón'];
 /* Combate y Campeonato no usan repeticiones (seg2 del home queda sin sentido
    ahí) -- su categoría real de ranking es tiempo+estrategia (S.cTime/S.cStrategy,
@@ -1133,8 +1178,10 @@ function saveScore(avg,total){
   var kp = curKeyParts();
   var rec={ s1:kp[0], s2:kp[1], s3:kp[2], name:nm, ensayos:S.resEnsayos, avg:Math.round(avg), tt:Math.round(total), ts:Date.now() };
   if(S.s1==='champ') rec.rounds=S.champRounds||0;
+  if(S.s1==='def' || S.s1==='atk') rec.def=S.resKDef||0;
+  if(S.s1==='cmb'){ rec.score=S.resScore||0; rec.rivalScore=S.resRivalScore||0; }
   var k=lbKey(kp[0],kp[1],kp[2]), lb=loadLb(k);
-  lb.push(rec); sortLb(lb); lb=lb.slice(0,50);
+  lb.push(rec); sortLb(lb,kp[0]); lb=lb.slice(0,50);
   try{ localStorage.setItem(k,JSON.stringify(lb)); }catch(e){}
   S.lastRec=rec; S.lastRecKey=k;
   if(window.fbSave){ window.fbSave(rec); }
@@ -1166,14 +1213,11 @@ function getHomeName(){
   return sport ? (nm+'-'+sport) : nm;
 }
 
-function renderRankList(list, el, latest){
+function renderRankList(list, el, latest, mode){
   list=filterRepeated(list);
   function rankBetter(a,b){
     if(a==null) return false; if(b==null) return true;
-    if((a.rounds||0)!==(b.rounds||0)) return (a.rounds||0)>(b.rounds||0);
-    var far=MENOR_ES_MEJOR?9999999:-9999999;
-    var av=(a.avg==null?far:a.avg), bv=(b.avg==null?far:b.avg);
-    return MENOR_ES_MEJOR ? av<bv : av>bv;
+    return rankCompare(a,b,mode) < 0;
   }
   var medals=['gold','silver','bronze'];
   var meName=getHomeName();
@@ -1196,7 +1240,11 @@ function renderRankList(list, el, latest){
     pos.textContent=posLabel;
     var nm=document.createElement('div');nm.className='rank-full-name';nm.textContent=entry.name;
     var ms=document.createElement('div');ms.className='rank-full-ms';
-    ms.textContent=(entry.rounds!=null ? CH_ROUND_NAMES[Math.max(0,Math.min(3,entry.rounds))]+' · ' : '')+entry.avg+' '+UNIDAD;
+    var prefix='';
+    if(entry.rounds!=null) prefix=CH_ROUND_NAMES[Math.max(0,Math.min(3,entry.rounds))]+' · ';
+    else if((mode==='def'||mode==='atk') && entry.def!=null) prefix=entry.def+'/'+(entry.ensayos!=null?entry.ensayos:entry.def)+' · ';
+    else if(mode==='cmb' && entry.score!=null) prefix=entry.score+'-'+(entry.rivalScore||0)+' · ';
+    ms.textContent=prefix+entry.avg+' '+UNIDAD;
     var dt=document.createElement('div');dt.className='rank-full-date';dt.textContent=entry.ts?fmtDate(entry.ts):'';
     row.appendChild(pos);row.appendChild(nm);row.appendChild(ms);row.appendChild(dt);
     return row;
@@ -1223,19 +1271,25 @@ function renderRankList(list, el, latest){
   }
 }
 
-/* seg2R (10/25/50) no significa nada para Combate ni Campeonato (ranking por
-   tiempo+estrategia, ver curKeyParts) -- se oculta y se sustituye por
-   S.cTime/S.cStrategy en vez de leerlo. Defensa/Ataque: tercer campo siempre 'paus'. */
+/* seg2R (10/25/50) no significa nada para Combate ni Campeonato -- se oculta y
+   se sustituye por seg2RTime (1/2/3 MIN, ver curKeyParts), que sí se puede
+   elegir a mano para consultar el ranking de cualquier duración jugada,
+   independientemente de con qué duración se jugó la última partida
+   (S.cTime solo se usa como valor inicial la primera vez que se entra).
+   Defensa/Ataque: tercer campo siempre 'paus'. */
 function updateRankFilterVis(v1){
-  $('seg2R').style.display = isCombatMode(v1) ? 'none' : 'flex';
+  var combat = isCombatMode(v1);
+  $('seg2R').style.display = combat ? 'none' : 'flex';
+  $('seg2RTime').style.display = combat ? 'flex' : 'none';
 }
 function rankV2V3(v1){
-  return isCombatMode(v1) ? [String(S.cTime||60), (S.cStrategy||'libre')] : [selVal('seg2R')||'25', 'paus'];
+  return isCombatMode(v1) ? [selVal('seg2RTime')||String(S.cTime||60), (S.cStrategy||'libre')] : [selVal('seg2R')||'25', 'paus'];
 }
 function rankFromSel(){
   var v1 = selVal('seg1R')||'def';
   updateRankFilterVis(v1);
   var v23 = rankV2V3(v1);
+  if(isCombatMode(v1) && !selVal('seg2RTime')) setSeg('seg2RTime', v23[0]);
   renderRank(v1, v23[0], v23[1]);
 }
 function segRank(id){
@@ -1269,6 +1323,7 @@ function showRanking(){
   updateRankFilterVis(v1);
   var v23=rankV2V3(v1);
   if(!isCombatMode(v1)){ v23=[selVal('seg2')||'25','paus']; setSeg('seg2R',v23[0]); }
+  else { v23=[String(S.cTime||60),(S.cStrategy||'libre')]; setSeg('seg2RTime',v23[0]); }
   renderRank(v1,v23[0],v23[1]); show('ranking');
 }
 function renderRank(v1,v2,v3){
@@ -1279,17 +1334,19 @@ function renderRank(v1,v2,v3){
   if(S.saved===false && isFinite(S.resAvg) && lbKey(kp[0],kp[1],kp[2])===key){
     latest={ name:(S.sport?(S.name+'-'+S.sport):S.name), avg:Math.round(S.resAvg), ensayos:S.resEnsayos, ts:Date.now() };
     if(S.s1==='champ') latest.rounds=S.champRounds||0;
+    if(S.s1==='def' || S.s1==='atk') latest.def=S.resKDef||0;
+    if(S.s1==='cmb'){ latest.score=S.resScore||0; latest.rivalScore=S.resRivalScore||0; }
   } else if(S.lastRec && S.lastRecKey===key){
     latest=S.lastRec;
   }
   var lbLocal=loadLb(key);
-  sortLb(lbLocal);
-  renderRankList(lbLocal, el, latest);
+  sortLb(lbLocal,v1);
+  renderRankList(lbLocal, el, latest, v1);
   if(window.fbLoad){
     window.fbLoad(v1,v2,v3).then(function(rows){
       if(rows && S.rankKey===key){
-        sortLb(rows);
-        renderRankList(rows, el, latest);
+        sortLb(rows,v1);
+        renderRankList(rows, el, latest, v1);
       }
     }).catch(function(){});
   }
@@ -1315,7 +1372,7 @@ seg('seg1'); seg('seg2'); seg('seg3'); segLink('seg1','seg3');
 seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
 $('segColor').addEventListener('click', updateMsRivalPreview);
 $('segGender').addEventListener('click', updateMsRivalPreview);
-segRank('seg1R'); segRank('seg2R');
+segRank('seg1R'); segRank('seg2R'); segRank('seg2RTime');
 $('btnRank2').addEventListener('click', showRanking);
 $('btnGuardar').addEventListener('click', function(){
   if(S.saved) return;
@@ -2280,18 +2337,26 @@ function cResolveCounter(tap){
     cAwardPoint('player', counterValue);
     return;
   }
-  /* Si fallo mi contraataque, el 50% de las veces el rival repite la MISMA
-     técnica una vez más -- sí puedo volver a pararla (cResolveRetaliation,
-     ventana normal de defender), pero si la paro no se reabre otra ventana
-     de contraataque para mí (nada de encadenar). 2026-09-16, pedido
-     expreso, corregido tras una primera versión que lo hacía automático:
-     "sí que puedo pararlo, pero no volver a tirar yo otro". */
+  /* Si fallo mi contraataque, el 50% de las veces el rival replica con OTRO
+     ataque real -- sí puedo volver a pararlo (cResolveRetaliation, ventana
+     normal de defender), pero si lo paro no se reabre otra ventana de
+     contraataque para mí (nada de encadenar). 2026-09-16, pedido expreso,
+     corregido tras una primera versión que lo hacía automático: "sí que
+     puedo pararlo, pero no volver a tirar yo otro". 2026-09-22: la réplica
+     dejó de repetir la MISMA técnica (pedido expreso, "para que no haya
+     equívocos") -- ahora cBeginRetaliation() elige una distinta. */
   if(Math.random()<0.5){ return cBeginRetaliation(); }
   C.state='done';
   C.timer=setTimeout(cParado, 500);
 }
 function cBeginRetaliation(){
-  var tech = C.pending;
+  // La replica ya NO repite la misma tecnica que se acaba de parar (2026-09-22,
+  // pedido expreso "para que no haya equivocos") -- se elige otra distinta,
+  // igual que cualquier otro ataque real del rival.
+  var name = cPickTech(C.lastTechName);
+  C.lastTechName = name;
+  var tech = { s:name, hx:K_HITS[name][0], hy:K_HITS[name][1], name:K_NAMES[name], sc:(K_SC[name]||1), winBonus:(K_WINBONUS[name]||0) };
+  C.pending = tech; K.tech = tech;
   $('cAmagoBtn').disabled=true; $('cAtkBtn').disabled=true;
   C.state='retaliation_attack';
   cShowPose(tech.s, tech, C.mirror);
@@ -2547,6 +2612,7 @@ function cFinishResults(){
   $('rV3').textContent=(C.attempts?Math.round(C.hits/C.attempts*100):0)+'%';
   $('rV4').textContent=(best===Infinity?'--':Math.round(best));
   S.resAvg=avg; S.resTotal=Math.max(0,((S.cTime||60)-C.timeLeft))*1000; S.resEnsayos=n; S.saved=false;
+  S.resScore=playerScore; S.resRivalScore=rivalScore;
   renderChart(C.times);
   var gb=$('btnGuardar'); if(gb){ gb.disabled=false; gb.textContent='Guardar resultado'; }
   showSaveScreen();
