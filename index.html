@@ -467,7 +467,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v76</div>
+    <div class="app-ver">v77</div>
     </div>
 
   </main>
@@ -1635,9 +1635,9 @@ function cWinParar(){ return C_WIN_PARAR_BASE - cAdaptivePenalty(); }
    umbral fijo de defender (y B de amago) distinto del de Libre/Plan C --
    ya NO suben/bajan por racha, ver nota de 2026-09-14 más arriba. */
 var PLAN_CONFIG = {
-  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:0, feintPerMin:5, defendStart:525 },
+  a: { label:'Plan A · Ataque',      atkPerMin:15, guardPerMin:5, feintPerMin:2, defendStart:525 },
   b: { label:'Plan B · Defensa',     atkPerMin:3, guardPerMin:14, feintPerMin:3, defendStart:475, amagoStart:300 },
-  c: { label:'Plan C · Provocación', atkPerMin:0, guardPerMin:5, feintPerMin:15 }
+  c: { label:'Plan C · Provocación', atkPerMin:2, guardPerMin:5, feintPerMin:15 }
 };
 function cPlanCfg(){ return C.plan && PLAN_CONFIG[C.plan]; }
 /* Baraja (Fisher-Yates) la cola fija de eventos de un plan para un combate
