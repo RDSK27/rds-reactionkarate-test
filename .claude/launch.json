@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "karate",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["_serve.js"],
+      "port": 5178
+    }
+  ]
+}
