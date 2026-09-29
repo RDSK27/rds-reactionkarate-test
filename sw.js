@@ -1,5 +1,5 @@
 /* RDS Plantilla - Service Worker */
-var CACHE = 'reactionkarate-v82';
+var CACHE = 'reactionkarate-v83';
 var ASSETS = [
   './',
   './index.html',
@@ -27,7 +27,9 @@ self.addEventListener('install', function(e){
 self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
-      return Promise.all(keys.map(function(k){ if(k!==CACHE){ return caches.delete(k); } }));
+      /* borra cache vieja de ESTA app (deja intactas las de otras apps RDS,
+         que comparten origen -- caches.keys() ve TODAS las del origen). */
+      return Promise.all(keys.map(function(k){ if(k.indexOf('reactionkarate-')===0 && k!==CACHE){ return caches.delete(k); } }));
     }).then(function(){ return self.clients.claim(); })
   );
 });
