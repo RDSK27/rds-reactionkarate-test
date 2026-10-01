@@ -468,7 +468,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v88</div>
+    <div class="app-ver">v89</div>
     <div id="pending-sync" class="pending-sync"></div>
     </div>
 
@@ -1338,6 +1338,16 @@ function showRanking(){
    nombre+fecha). */
 var rankUnsub=null;
 function stopRankWatch(){ if(rankUnsub){ try{ rankUnsub(); }catch(e){} rankUnsub=null; } }
+/* 2026-10-01: de lo local solo se muestran las marcas PENDIENTES de subir (la cola
+   rds_rkarate_pending), NO todo el historial de este dispositivo. Antes se sumaba todo lo
+   guardado en local y, si alguna marca nunca llego a Firestore, solo este aparato
+   la veia y los rankings de distintos aparatos no coincidian. Las marcas ya
+   subidas llegan por el ranking global; las pendientes se ven aqui hasta que suban. */
+function pendingOnly(list){
+  var set={};
+  try{ JSON.parse(localStorage.getItem('rds_rkarate_pending')||'[]').forEach(function(q){ var r=(q && q.entry) ? q.entry : q; if(r) set[(r.name||'')+'|'+(r.ts||r.date||'')]=1; }); }catch(e){}
+  return (list||[]).filter(function(r){ return set[(r.name||'')+'|'+(r.ts||r.date||'')]; });
+}
 function mergeRank(globalRows,localRows){
   var out=[], seen={};
   (globalRows||[]).concat(localRows||[]).forEach(function(r){
@@ -1374,7 +1384,7 @@ function renderRank(v1,v2,v3){
   } else if(S.lastRec && S.lastRecKey===key){
     latest=S.lastRec;
   }
-  var lbLocal=loadLb(key);
+  var lbLocal=pendingOnly(loadLb(key));
   var rcKey=rankCacheKey(v1,v2,v3);
   function draw(raw){
     var rows=mergeRank(raw,lbLocal);
