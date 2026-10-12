@@ -218,7 +218,7 @@ function rangeOrFull(req, cached){
   });
 }
 
-self.addEventListener('fetch', function(e){
+self.addEventListener('fetch', function(e){ if(e.request.url.indexOf('/rds-rankings-data/')!==-1){ return; }   /* JSON de rankings: siempre de la red (cache-first lo dejaria viejo) */
   var req = e.request;
   if(req.method !== 'GET'){ return; }
   var url = new URL(req.url);
