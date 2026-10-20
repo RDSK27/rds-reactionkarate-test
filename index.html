@@ -109,7 +109,9 @@ if('serviceWorker' in navigator){
   }
   .segment button:last-child{border-right:0;}
   .segment button.sel{background:var(--rojo);color:#fff;text-shadow:none;}
-  #seg2,#seg3{margin-top:0;}
+  #seg2{margin-top:0;}
+  .segment.off{opacity:.35;pointer-events:none;}   /* v97: fila que no aplica al modo elegido */
+  #seg1 button{font-size:0.7rem;letter-spacing:0.03em;}   /* 4 botones en una fila: Defensa | Ataque | Combate | Campeonato */
 
   /* Foto del rival (saludando) en la pantalla "Elige rival"/"Configura el
      combate" -- se actualiza en vivo al cambiar Rival AKA/AO o
@@ -412,6 +414,8 @@ if('serviceWorker' in navigator){
     <div class="segment" id="seg1">
       <button class="sel" data-v="def">Defensa</button>
       <button data-v="atk">Ataque</button>
+      <button data-v="cmb">Combate</button>
+      <button data-v="champ">Campeonato</button>
     </div>
 
     <div class="segment" id="seg2">
@@ -420,10 +424,6 @@ if('serviceWorker' in navigator){
       <button data-v="50">50</button>
     </div>
 
-    <div class="segment" id="seg3">
-      <button data-v="cmb">Combate</button>
-      <button data-v="champ">Campeonato</button>
-    </div>
 
     <div style="border:3px solid #b03020;border-radius:10px;background-color:#000000;padding:20px 12px 12px;display:flex;flex-direction:column;align-items:center;width:92%;min-height:250px;box-sizing:border-box;margin:auto auto 28px;">
       <div class="home-btn-row">
@@ -473,7 +473,7 @@ if('serviceWorker' in navigator){
       </select>
     </div>
   </div>
-    <div class="app-ver">v96</div>
+    <div class="app-ver">v97</div>
     <div id="pending-sync" class="pending-sync"></div>
     </div>
 
@@ -851,7 +851,7 @@ function filterInitials(el){ el.value=el.value.replace(/[^A-Za-z]/g,'').toUpperC
 
 /* Modo elegido en el inicio: Defensa/Ataque (fila de arriba) o Combate/Campeonato
    (fila de abajo). Solo una de las dos filas tiene seleccion a la vez (segLink). */
-function homeMode(){ return selVal('seg1')||selVal('seg3')||'def'; }
+function homeMode(){ return selVal('seg1')||'def'; }   /* v97: Defensa | Ataque | Combate | Campeonato en UNA fila (antes Combate/Campeonato estaban en una 3a fila enlazada) */
 function isCombatMode(m){ return m==='cmb' || m==='champ'; }
 
 /* ---------- Arranque del ejercicio ---------- */
@@ -1432,7 +1432,7 @@ function renderRank(v1,v2,v3){
 
 function goHome(){ show('home'); }
 
-/* Las filas seg1 (Defensa/Ataque) y seg3 (Combate/Campeonato) son UN solo selector:
+/* [v97: seg3 eliminada; Combate y Campeonato estan ahora en seg1] Antes seg1 (Defensa/Ataque) y seg3 (Combate/Campeonato) eran UN solo selector:
    al elegir en una se deselecciona la otra. seg2 (10/25/50) solo cuenta en Defensa/Ataque;
    el tiempo de Combate/Campeonato se elige en el panel "Configura..." tras pulsar START. */
 function segLink(a,b){
@@ -1446,7 +1446,10 @@ function segLink(a,b){
 }
 
 /* ---------- Wiring ---------- */
-seg('seg1'); seg('seg2'); seg('seg3'); segLink('seg1','seg3');
+seg('seg1'); seg('seg2');
+/* 10/25/50 solo cuenta en Defensa/Ataque: se atenua en Combate y Campeonato (el tiempo se elige despues en el panel de configuracion) */
+function applyHomeModeUI(){ $('seg2').classList.toggle('off', isCombatMode(homeMode())); }
+$('seg1').addEventListener('click', applyHomeModeUI); applyHomeModeUI();
 seg('segColor'); seg('segGender'); seg('segTime'); seg('segStrategy');
 $('segColor').addEventListener('click', updateMsRivalPreview);
 $('segGender').addEventListener('click', updateMsRivalPreview);
