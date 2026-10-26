@@ -1,5 +1,5 @@
 /* RDS Reaction Karate - Service Worker */
-var CACHE = 'reactionkarate-v94';
+var CACHE = 'reactionkarate-v95';
 
 /* Imagenes y sonidos (assets/, ~9 MB) en una cache APARTE y PERSISTENTE (2026-10-02).
    Antes solo se guardaba lo que se pedia online y cada version nueva borraba la cache
